@@ -203,11 +203,20 @@ module.exports = async (req, res) => {
     // Resolve UUID if rawId is a name or slug
     if (!isUUID(rawId)) {
       try {
-        const findRes = await fetch(`${supabaseUrl}/rest/v1/products?name=ilike.${encodeURIComponent(update.name || rawId)}&select=id`, { headers: sbHeaders });
-        if (findRes.ok) {
-          const found = await findRes.json();
-          if (found && found.length > 0) realId = found[0].id;
-        }
+        const cleanSlug = rawId.toLowerCase().replace(/[^a-z0-9]+/g, '');
+        const cleanName = (update.name || rawId).split(' ')[0].trim();
+        const [bySlug, byName, byWord] = await Promise.all([
+          fetch(`${supabaseUrl}/rest/v1/products?slug=eq.${encodeURIComponent(rawId)}&select=id`, { headers: sbHeaders }).catch(() => null),
+          fetch(`${supabaseUrl}/rest/v1/products?name=ilike.%${encodeURIComponent(update.name || rawId)}%&select=id`, { headers: sbHeaders }).catch(() => null),
+          fetch(`${supabaseUrl}/rest/v1/products?name=ilike.%${encodeURIComponent(cleanName)}%&select=id`, { headers: sbHeaders }).catch(() => null)
+        ]);
+
+        const r1 = bySlug && bySlug.ok ? await bySlug.json() : [];
+        const r2 = byName && byName.ok ? await byName.json() : [];
+        const r3 = byWord && byWord.ok ? await byWord.json() : [];
+
+        const match = (r1 && r1[0]) || (r2 && r2[0]) || (r3 && r3[0]);
+        if (match && match.id) realId = match.id;
       } catch (e) {}
     }
 
