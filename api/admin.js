@@ -192,6 +192,7 @@ module.exports = async (req, res) => {
 
   // 4. Update Tool (PUT /tools/:id with UUID Resolver)
   if (urlPath.startsWith('/tools/') && method === 'PUT') {
+    try {
     const rawId = urlPath.replace('/tools/', '').split('/')[0];
     let update = req.body || {};
     if (typeof update === 'string') {
@@ -295,6 +296,10 @@ module.exports = async (req, res) => {
     }
 
     return res.status(200).json({ success: true, tool: { ...update, id: realId } });
+    } catch (globalErr) {
+      console.error('PUT /tools global error:', globalErr);
+      return res.status(500).json({ success: false, message: globalErr.message });
+    }
   }
 
   // 5. Delete Tool (DELETE /tools/:id)
