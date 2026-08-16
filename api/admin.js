@@ -5,6 +5,9 @@ const crypto = require('crypto');
 // Prevent Vercel edge caching by wrapping global fetch
 const originalFetch = global.fetch;
 global.fetch = function(url, options = {}) {
+  if (typeof url === 'object' && url !== null && url.url) {
+    return originalFetch(url, { cache: 'no-store', ...options });
+  }
   return originalFetch(url, { ...options, cache: 'no-store' });
 };
 
