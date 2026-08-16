@@ -68,7 +68,9 @@
       ...(options.headers || {})
     };
     try {
-      const res = await fetch(`${API_BASE}${endpoint}`, options);
+      const separator = endpoint.includes('?') ? '&' : '?';
+      const cacheBust = options.method && options.method !== 'GET' ? '' : `${separator}_=${Date.now()}`;
+      const res = await fetch(`${API_BASE}${endpoint}${cacheBust}`, options);
       if (res.status === 401) {
         logout();
         return null;
