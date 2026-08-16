@@ -6,7 +6,7 @@
       "slug": "chatgpt",
       "description": "ChatGPT is an AI-powered assistant for writing, coding, research, and everyday productivity with fast and accurate responses.",
       "price": 2300,
-      "image": "https://i.postimg.cc/zXJ28QZP/images-8.png",
+      "image": "/product-images/c9cfe01e69991fec7f9caa41aa58de96.png",
       "category_id": "6230af5a-3103-4a36-bc56-edb18842798a",
       "category_name": "AI Tools",
       "status": "in_stock",
@@ -6639,29 +6639,7 @@
     "logo_url": "/logo.png"
   },
   "popular_picks": [
-    {
-      "id": "pick_1",
-      "product_id": "e892e52e-eb16-4e51-947c-bdd56439c661",
-      "name": "ChatGPT",
-      "price": 2300,
-      "category_name": "AI Tools",
-      "icon_url": "https://i.postimg.cc/zXJ28QZP/images-8.png",
-      "badge": "🔥 HOT",
-      "sort_order": 0,
-      "enabled": true,
-      "updated_at": "2026-08-15T14:01:58.351Z"
-    },
-    {
-      "id": "pick_2",
-      "product_id": "c8ef47b8-9a29-42dd-9946-e7e0cc449e50",
-      "name": "CapCut Pro",
-      "price": 1000,
-      "category_name": "Design Tools",
-      "icon_url": "/product-images/capcut-pro.jpg",
-      "badge": "⚡ 2-MIN DELIVERY",
-      "sort_order": 1,
-      "enabled": true,
-      "updated_at": "2026-08-15T13:59:08.290Z"
-    }
+    "e892e52e-eb16-4e51-947c-bdd56439c661",
+    "c8ef47b8-9a29-42dd-9946-e7e0cc449e50"
   ]
 }
