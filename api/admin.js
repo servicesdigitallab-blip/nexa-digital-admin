@@ -318,110 +318,159 @@ module.exports = async (req, res) => {
     return res.status(200).json({ success: true });
   }
 
-  // 6. Popular Picks
-  if (urlPath === '/popular-picks' && method === 'GET') {
-    let finalPicks = store.popular_picks || [];
+  // === HELPER: Read current picks array from Supabase ===
+  async function getCloudPicks() {
     try {
-      const setRes = await fetch(`${supabaseUrl}/rest/v1/site_settings?id=eq.${SETTINGS_ID}&select=hero`, { headers: sbHeaders });
+      const [setRes, prodRes] = await Promise.all([
+        fetch(`${supabaseUrl}/rest/v1/site_settings?id=eq.${SETTINGS_ID}&select=hero`, { headers: sbHeaders }),
+        fetch(`${supabaseUrl}/rest/v1/products?select=id,name,slug,price,image,category_id`, { headers: sbHeaders }).catch(() => null)
+      ]);
+      const allProducts = (prodRes && prodRes.ok) ? await prodRes.json() : (store.products || []);
+      const catMap = {};
+      (store.categories || []).forEach(c => { catMap[c.id] = c.name; });
+
       if (setRes.ok) {
         const rows = await setRes.json();
-        if (rows[0] && rows[0].hero && rows[0].hero.popular_picks) {
-          const pIds = rows[0].hero.popular_picks;
-          // Map string IDs to full objects that the admin panel expects
-          finalPicks = pIds.map((id, idx) => {
-            const tool = (store.products || []).find(t => t.id === id || t.slug === id) || {};
+        if (rows[0] && rows[0].hero && Array.isArray(rows[0].hero.popular_picks)) {
+          const raw = rows[0].hero.popular_picks;
+          // Support both formats: array of strings (old) and array of objects (new)
+          return raw.map((item, idx) => {
+            if (typeof item === 'object' && item !== null) {
+              // Already a full object — enrich with latest product data
+              const tool = allProducts.find(t => t.id === item.product_id) || {};
+              return {
+                id: item.id || ('pick_' + idx),
+                product_id: item.product_id || tool.id || '',
+                name: item.name || tool.name || 'Unknown',
+                category_name: item.category_name || catMap[tool.category_id] || 'AI Tools',
+                price: item.price !== undefined ? item.price : (tool.price || 0),
+                badge: item.badge || '',
+                icon_url: item.icon_url || tool.image || '',
+                enabled: item.enabled !== undefined ? item.enabled : true
+              };
+            }
+            // Old format: plain string ID
+            const tool = allProducts.find(t => t.id === item || t.slug === item) || {};
             return {
               id: 'pick_' + idx,
-              product_id: tool.id || id,
+              product_id: tool.id || item,
               name: tool.name || 'Unknown',
-              category_name: tool.category_name || 'AI Tools',
+              category_name: catMap[tool.category_id] || 'AI Tools',
               price: tool.price || 0,
+              badge: '',
               icon_url: tool.image || '',
               enabled: true
             };
           });
         }
       }
-    } catch(e) {}
-    return res.status(200).json({ picks: finalPicks, tools: store.products || [] });
+    } catch (e) { console.error('getCloudPicks error:', e); }
+    return [];
   }
 
-  
-  // --- Popular Picks Management (Admin -> Storefront Sync) ---
+  // === HELPER: Save picks array to Supabase as full objects ===
+  async function saveCloudPicks(picks) {
+    try {
+      const setRes = await fetch(`${supabaseUrl}/rest/v1/site_settings?id=eq.${SETTINGS_ID}&select=hero`, { headers: sbHeaders });
+      if (setRes.ok) {
+        const rows = await setRes.json();
+        const hero = (rows[0] && rows[0].hero) || {};
+        hero.popular_picks = picks.map(p => ({
+          id: p.id,
+          product_id: p.product_id,
+          name: p.name,
+          category_name: p.category_name,
+          price: p.price,
+          badge: p.badge || '',
+          icon_url: p.icon_url || '',
+          enabled: p.enabled !== false
+        }));
+        await fetch(`${supabaseUrl}/rest/v1/site_settings?id=eq.${SETTINGS_ID}`, {
+          method: 'PATCH', headers: sbHeaders, body: JSON.stringify({ hero })
+        });
+      }
+    } catch (e) { console.error('saveCloudPicks error:', e); }
+  }
+
+  // 6. Popular Picks — GET
+  if (urlPath === '/popular-picks' && method === 'GET') {
+    const picks = await getCloudPicks();
+    // Also fetch tools list for the admin "Select Tool" dropdown
+    let tools = store.products || [];
+    try {
+      const prodRes = await fetch(`${supabaseUrl}/rest/v1/products?select=*&order=sort_order.asc,created_at.desc`, { headers: sbHeaders });
+      if (prodRes && prodRes.ok) tools = await prodRes.json();
+    } catch(e) {}
+    return res.status(200).json({ picks, tools });
+  }
+
+  // --- Popular Picks: POST (Add New) ---
   if (urlPath === '/popular-picks' && method === 'POST') {
-    let picks = store.popular_picks || [];
-    const newPick = { ...req.body, id: 'pick_' + Date.now() };
-    picks.push(newPick);
-    store.popular_picks = picks;
-    fs.writeFileSync(storePath, JSON.stringify(store, null, 2), 'utf8');
-    
-    // Sync to Supabase site_settings
     try {
-      const pIds = picks.map(p => p.product_id).filter(Boolean);
-      const setRes = await fetch(`${supabaseUrl}/rest/v1/site_settings?id=eq.${SETTINGS_ID}&select=hero`, { headers: sbHeaders });
-      if (setRes.ok) {
-        const rows = await setRes.json();
-        const hero = (rows[0] && rows[0].hero) || {};
-        hero.popular_picks = pIds;
-        await fetch(`${supabaseUrl}/rest/v1/site_settings?id=eq.${SETTINGS_ID}`, {
-          method: 'PATCH', headers: sbHeaders, body: JSON.stringify({ hero })
-        });
-      }
-    } catch(e) {}
-    
-    return res.status(200).json({ success: true, picks });
-  }
-
-  if (urlPath.startsWith('/popular-picks/') && (method === 'PUT' || method === 'DELETE')) {
-    const pId = urlPath.split('/').pop();
-    let picks = store.popular_picks || [];
-    
-    if (method === 'PUT') {
-      const idx = picks.findIndex(p => p.id === pId);
-      if (idx !== -1) {
-        picks[idx] = { ...picks[idx], ...req.body, id: pId };
-      }
-    } else if (method === 'DELETE') {
-      picks = picks.filter(p => p.id !== pId);
+      const picks = await getCloudPicks();
+      const body = req.body || {};
+      const newPick = {
+        id: 'pick_' + Date.now(),
+        product_id: body.product_id || '',
+        name: body.name || 'New Tool',
+        category_name: body.category_name || 'AI Tools',
+        price: Number(body.price || 0),
+        badge: body.badge || '',
+        icon_url: body.icon_url || '',
+        enabled: body.enabled !== false
+      };
+      picks.push(newPick);
+      await saveCloudPicks(picks);
+      return res.status(200).json({ success: true, picks });
+    } catch (e) {
+      console.error('POST /popular-picks error:', e);
+      return res.status(500).json({ success: false, message: e.message });
     }
-    
-    store.popular_picks = picks;
-    fs.writeFileSync(storePath, JSON.stringify(store, null, 2), 'utf8');
-    
-    try {
-      const pIds = picks.map(p => p.product_id).filter(Boolean);
-      const setRes = await fetch(`${supabaseUrl}/rest/v1/site_settings?id=eq.${SETTINGS_ID}&select=hero`, { headers: sbHeaders });
-      if (setRes.ok) {
-        const rows = await setRes.json();
-        const hero = (rows[0] && rows[0].hero) || {};
-        hero.popular_picks = pIds;
-        await fetch(`${supabaseUrl}/rest/v1/site_settings?id=eq.${SETTINGS_ID}`, {
-          method: 'PATCH', headers: sbHeaders, body: JSON.stringify({ hero })
-        });
-      }
-    } catch(e) {}
-    
-    return res.status(200).json({ success: true, picks });
   }
 
-  if (urlPath === '/popular-picks-reorder' && method === 'PUT') {
-    store.popular_picks = req.body;
-    fs.writeFileSync(storePath, JSON.stringify(store, null, 2), 'utf8');
-    
+  // --- Popular Picks: PUT (Edit) / DELETE ---
+  if (urlPath.startsWith('/popular-picks/') && (method === 'PUT' || method === 'DELETE')) {
     try {
-      const pIds = req.body.map(p => p.product_id).filter(Boolean);
-      const setRes = await fetch(`${supabaseUrl}/rest/v1/site_settings?id=eq.${SETTINGS_ID}&select=hero`, { headers: sbHeaders });
-      if (setRes.ok) {
-        const rows = await setRes.json();
-        const hero = (rows[0] && rows[0].hero) || {};
-        hero.popular_picks = pIds;
-        await fetch(`${supabaseUrl}/rest/v1/site_settings?id=eq.${SETTINGS_ID}`, {
-          method: 'PATCH', headers: sbHeaders, body: JSON.stringify({ hero })
-        });
+      const pId = urlPath.split('/').pop();
+      let picks = await getCloudPicks();
+
+      if (method === 'PUT') {
+        const body = req.body || {};
+        const idx = picks.findIndex(p => p.id === pId);
+        if (idx !== -1) {
+          picks[idx] = { ...picks[idx], ...body, id: pId };
+        } else {
+          // Fallback: try to match by index from the pId (e.g. 'pick_0' → index 0)
+          const numMatch = pId.match(/pick_(\d+)/);
+          if (numMatch) {
+            const fallbackIdx = parseInt(numMatch[1]);
+            if (fallbackIdx < picks.length) {
+              picks[fallbackIdx] = { ...picks[fallbackIdx], ...body, id: pId };
+            }
+          }
+        }
+      } else if (method === 'DELETE') {
+        picks = picks.filter(p => p.id !== pId);
       }
-    } catch(e) {}
-    
-    return res.status(200).json({ success: true });
+
+      await saveCloudPicks(picks);
+      return res.status(200).json({ success: true, picks });
+    } catch (e) {
+      console.error('PUT/DELETE /popular-picks error:', e);
+      return res.status(500).json({ success: false, message: e.message });
+    }
+  }
+
+  // --- Popular Picks: Reorder ---
+  if (urlPath === '/popular-picks-reorder' && method === 'PUT') {
+    try {
+      const picks = req.body || [];
+      await saveCloudPicks(picks);
+      return res.status(200).json({ success: true });
+    } catch (e) {
+      console.error('PUT /popular-picks-reorder error:', e);
+      return res.status(500).json({ success: false, message: e.message });
+    }
   }
 
   // 7. Live Cloud-Persistent Analytics Dashboard
