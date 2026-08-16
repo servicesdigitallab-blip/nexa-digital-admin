@@ -203,12 +203,12 @@ module.exports = async (req, res) => {
     // Resolve UUID if rawId is a name or slug
     if (!isUUID(rawId)) {
       try {
-        const cleanSlug = rawId.toLowerCase().replace(/[^a-z0-9]+/g, '');
-        const cleanName = (update.name || rawId).split(' ')[0].trim();
+        const rawClean = rawId.replace(/[^a-zA-Z0-9]/g, '');
+        const nameWord = (update.name || rawId).split(' ')[0].trim();
         const [bySlug, byName, byWord] = await Promise.all([
           fetch(`${supabaseUrl}/rest/v1/products?slug=eq.${encodeURIComponent(rawId)}&select=id`, { headers: sbHeaders }).catch(() => null),
-          fetch(`${supabaseUrl}/rest/v1/products?name=ilike.%${encodeURIComponent(update.name || rawId)}%&select=id`, { headers: sbHeaders }).catch(() => null),
-          fetch(`${supabaseUrl}/rest/v1/products?name=ilike.%${encodeURIComponent(cleanName)}%&select=id`, { headers: sbHeaders }).catch(() => null)
+          fetch(`${supabaseUrl}/rest/v1/products?name=ilike.*${encodeURIComponent(nameWord)}*&select=id`, { headers: sbHeaders }).catch(() => null),
+          fetch(`${supabaseUrl}/rest/v1/products?name=ilike.*${encodeURIComponent(rawClean)}*&select=id`, { headers: sbHeaders }).catch(() => null)
         ]);
 
         const r1 = bySlug && bySlug.ok ? await bySlug.json() : [];
