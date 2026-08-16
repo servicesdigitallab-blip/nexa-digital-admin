@@ -1,4 +1,4 @@
-import{aL as a}from"./index-DZT4_D0V.js";/**
+import{aL as a}from"./app-nexa-store.js";/**
  * @license lucide-react v0.462.0 - ISC
  *
  * This source code is licensed under the ISC license.
