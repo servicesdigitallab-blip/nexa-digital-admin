@@ -323,24 +323,34 @@ module.exports = async (req, res) => {
     return res.status(200).json({ success: true });
   }
 
-  // 7. Live Analytics Dashboard (Real-time telemetry)
+  // 7. Live Analytics Dashboard (Real-time telemetry & Cloud Persistence)
   if (urlPath.startsWith('/analytics')) {
     try {
-      // Fetch telemetry stats from track endpoint
-      const trackRes = await fetch(`${req.headers['x-forwarded-proto'] || 'https'}://${req.headers.host}/api/track`).catch(() => null);
-      if (trackRes && trackRes.ok) {
-        const stats = await trackRes.json();
-        return res.status(200).json(stats);
+      const setRes = await fetch(`${supabaseUrl}/rest/v1/site_settings?id=eq.066a4027-9df8-45ee-ac41-32f26f11a507&select=about`, { headers: sbHeaders });
+      if (setRes.ok) {
+        const rows = await setRes.json();
+        if (rows[0] && rows[0].about && rows[0].about.analytics) {
+          const cloudStats = rows[0].about.analytics;
+          return res.status(200).json({
+            live_visitors: 1,
+            total_visits: cloudStats.total_visits || 1,
+            mobile_visits: cloudStats.mobile_visits || 0,
+            desktop_visits: cloudStats.desktop_visits || 1,
+            total_clicks: cloudStats.total_clicks || 0,
+            total_tool_views: cloudStats.total_tool_views || 0,
+            tool_clicks: cloudStats.tool_clicks || []
+          });
+        }
       }
     } catch(e) {}
 
     return res.status(200).json({
       live_visitors: 1,
-      total_visits: 18,
-      mobile_visits: 12,
-      desktop_visits: 6,
-      total_clicks: 5,
-      total_tool_views: 32,
+      total_visits: 1,
+      mobile_visits: 0,
+      desktop_visits: 1,
+      total_clicks: 0,
+      total_tool_views: 0,
       tool_clicks: []
     });
   }
