@@ -917,5 +917,71 @@ module.exports = async (req, res) => {
     }
   }
 
+  // 12. Contact Inquiries / Messages
+  if (urlPath === '/contact-inquiries' && method === 'GET') {
+    try {
+      const getRes = await fetch(`${supabaseUrl}/rest/v1/site_settings?id=eq.${SETTINGS_ID}&select=contact`, { headers: sbHeaders });
+      if (getRes.ok) {
+        const rows = await getRes.json();
+        if (rows && rows[0] && rows[0].contact) {
+          const inquiries = Array.isArray(rows[0].contact.inquiries) ? rows[0].contact.inquiries : [];
+          return res.status(200).json({ inquiries });
+        }
+      }
+    } catch(e) {}
+    return res.status(200).json({ inquiries: [] });
+  }
+
+  if (urlPath.startsWith('/contact-inquiries/') && urlPath.endsWith('/read') && method === 'PUT') {
+    try {
+      const id = urlPath.replace('/contact-inquiries/', '').replace('/read', '').split('/')[0];
+      const getRes = await fetch(`${supabaseUrl}/rest/v1/site_settings?id=eq.${SETTINGS_ID}&select=contact`, { headers: sbHeaders });
+      if (getRes.ok) {
+        const rows = await getRes.json();
+        if (rows && rows[0] && rows[0].contact) {
+          const contactData = rows[0].contact;
+          const inquiries = Array.isArray(contactData.inquiries) ? contactData.inquiries : [];
+          const idx = inquiries.findIndex(iq => iq.id === id);
+          if (idx !== -1) {
+            inquiries[idx].status = 'read';
+            contactData.inquiries = inquiries;
+            await fetch(`${supabaseUrl}/rest/v1/site_settings?id=eq.${SETTINGS_ID}`, {
+              method: 'PATCH',
+              headers: sbHeaders,
+              body: JSON.stringify({ contact: contactData, updated_at: new Date().toISOString() })
+            });
+          }
+        }
+      }
+      return res.status(200).json({ success: true });
+    } catch(e) {
+      return res.status(500).json({ success: false, message: e.message });
+    }
+  }
+
+  if (urlPath.startsWith('/contact-inquiries/') && method === 'DELETE') {
+    try {
+      const id = urlPath.replace('/contact-inquiries/', '').split('/')[0];
+      const getRes = await fetch(`${supabaseUrl}/rest/v1/site_settings?id=eq.${SETTINGS_ID}&select=contact`, { headers: sbHeaders });
+      if (getRes.ok) {
+        const rows = await getRes.json();
+        if (rows && rows[0] && rows[0].contact) {
+          const contactData = rows[0].contact;
+          let inquiries = Array.isArray(contactData.inquiries) ? contactData.inquiries : [];
+          inquiries = inquiries.filter(iq => iq.id !== id);
+          contactData.inquiries = inquiries;
+          await fetch(`${supabaseUrl}/rest/v1/site_settings?id=eq.${SETTINGS_ID}`, {
+            method: 'PATCH',
+            headers: sbHeaders,
+            body: JSON.stringify({ contact: contactData, updated_at: new Date().toISOString() })
+          });
+        }
+      }
+      return res.status(200).json({ success: true });
+    } catch(e) {
+      return res.status(500).json({ success: false, message: e.message });
+    }
+  }
+
   res.status(200).json({ success: true });
 };

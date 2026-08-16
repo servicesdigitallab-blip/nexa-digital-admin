@@ -26,6 +26,8 @@
     coupons: [],
     freebies: [],
     reviews: [],
+    inquiries: [],
+    viewingInquiry: null,
     searchQuery: '',
     categoryFilter: 'all',
     editingTool: null,
@@ -120,13 +122,14 @@
 
   async function loadAllData() {
     if (!state.token) return;
-    const [analytics, tools, picks, coupons, freebies, reviews] = await Promise.all([
+    const [analytics, tools, picks, coupons, freebies, reviews, inquiries] = await Promise.all([
       apiFetch(`/analytics?range=${state.timeRange}`),
       apiFetch('/tools'),
       apiFetch('/popular-picks'),
       apiFetch('/coupons'),
       apiFetch('/freebies'),
-      apiFetch('/reviews')
+      apiFetch('/reviews'),
+      apiFetch('/contact-inquiries')
     ]);
 
     if (analytics) state.analytics = analytics;
@@ -138,6 +141,7 @@
     if (coupons) state.coupons = coupons.coupons || [];
     if (freebies) state.freebies = freebies.freebies || [];
     if (reviews) state.reviews = reviews.reviews || [];
+    if (inquiries) state.inquiries = inquiries.inquiries || [];
     render();
   }
 
@@ -154,6 +158,7 @@
 
   // --- SVG Icons Helper ---
   const icons = {
+    messages: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"></path></svg>',
     picks: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.975 7.975 0 0120 13a7.975 7.975 0 01-2.343 5.657z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.879 16.121A3 3 0 1012.015 11L11 14H9c0 .768.293 1.536.879 2.121z"></path></svg>',
     dashboard: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path></svg>',
     tools: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>',
@@ -194,6 +199,7 @@
       ${state.editingFreebie ? renderFreebieModal() : ''}
       ${state.editingReview ? renderReviewModal() : ''}
       ${state.editingPick ? renderPickModal() : ''}
+      ${state.viewingInquiry ? renderInquiryModal() : ''}
     `;
 
     bindAppEvents();
@@ -243,6 +249,7 @@
       { id: 'tools', label: 'Tools & Catalog', icon: icons.tools, badge: state.tools.length },
       { id: 'picks', label: 'Popular Picks (Hero)', icon: icons.picks, badge: (state.popularPicks || []).filter(p => p.enabled !== false).length },
       { id: 'coupons', label: 'Coupons Engine', icon: icons.coupons, badge: state.coupons.filter(c => c.is_active).length },
+      { id: 'inquiries', label: 'Contact Inquiries', icon: icons.messages, badge: (state.inquiries || []).filter(i => i.status === 'new').length },
       { id: 'freebies', label: 'Editing Packs', icon: icons.freebies, badge: state.freebies.length },
       { id: 'reviews', label: 'Customer Reviews', icon: icons.reviews, badge: state.reviews.length }
     ];
@@ -325,6 +332,7 @@
       case 'tools': return renderToolsTab();
       case 'picks': return renderPopularPicksTab();
       case 'coupons': return renderCouponsTab();
+      case 'inquiries': return renderInquiriesTab();
       case 'freebies': return renderFreebiesTab();
       case 'reviews': return renderReviewsTab();
       default: return renderDashboardTab();
@@ -1845,6 +1853,169 @@
       body: JSON.stringify({ ids: reorderedIds })
     });
   };
+
+  
+  // --- Tab 4b: Contact Inquiries / Messages ---
+  function renderInquiriesTab() {
+    const list = state.inquiries || [];
+    const q = (state.searchQuery || '').toLowerCase();
+    const filtered = list.filter(item => {
+      return (item.name || '').toLowerCase().includes(q) ||
+             (item.email || '').toLowerCase().includes(q) ||
+             (item.subject || '').toLowerCase().includes(q) ||
+             (item.message || '').toLowerCase().includes(q);
+    });
+
+    const unreadCount = list.filter(i => i.status === 'new').length;
+
+    return `
+      <div class="space-y-6">
+        <!-- Header -->
+        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div>
+            <h2 class="text-2xl font-bold font-syne text-zinc-100 flex items-center gap-3">
+              <span>Contact Inquiries</span>
+              <span class="text-xs px-2.5 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400 font-semibold">${list.length} total</span>
+              ${unreadCount > 0 ? `<span class="text-xs px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-semibold">${unreadCount} new</span>` : ''}
+            </h2>
+            <p class="text-xs text-zinc-400 mt-1">Real-time messages submitted by visitors from the website Contact page</p>
+          </div>
+
+          <div class="flex items-center gap-3 w-full sm:w-auto">
+            <input type="text" value="${state.searchQuery || ''}" oninput="state.searchQuery = this.value; render();" placeholder="Search inquiries..." class="w-full sm:w-64 bg-zinc-900/80 border border-zinc-700/80 rounded-xl px-4 py-2.5 text-xs text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-amber-500">
+            <button onclick="loadAllData()" title="Refresh messages" class="p-2.5 rounded-xl bg-zinc-900 border border-zinc-700/80 text-zinc-300 hover:text-zinc-100 hover:bg-zinc-800 transition-colors shrink-0">
+              ${icons.refresh || '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>'}
+            </button>
+          </div>
+        </div>
+
+        <!-- Inquiries List -->
+        ${filtered.length === 0 ? `
+          <div class="glass-card rounded-3xl p-12 text-center border border-zinc-800">
+            <div class="w-16 h-16 rounded-2xl bg-zinc-900 flex items-center justify-center mx-auto mb-4 text-zinc-500">
+              ${icons.messages}
+            </div>
+            <h3 class="text-base font-bold text-zinc-200">No Inquiries Found</h3>
+            <p class="text-xs text-zinc-400 mt-1">When users submit the form on the Contact page, inquiries will appear here in real-time.</p>
+          </div>
+        ` : `
+          <div class="glass-card rounded-3xl border border-zinc-800/80 overflow-hidden shadow-xl">
+            <div class="overflow-x-auto custom-scrollbar">
+              <table class="w-full text-left text-xs">
+                <thead class="bg-zinc-900/90 text-zinc-400 uppercase tracking-wider font-semibold border-b border-zinc-800">
+                  <tr>
+                    <th class="py-3.5 px-6">Sender</th>
+                    <th class="py-3.5 px-6">Subject & Preview</th>
+                    <th class="py-3.5 px-6">Date</th>
+                    <th class="py-3.5 px-6">Status</th>
+                    <th class="py-3.5 px-6 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-zinc-800/60">
+                  ${filtered.map(item => `
+                    <tr class="hover:bg-zinc-900/40 transition-colors ${item.status === 'new' ? 'bg-amber-500/[0.03]' : ''}">
+                      <td class="py-4 px-6">
+                        <div class="font-bold text-zinc-100 text-sm">${escapeHtml(item.name || 'Anonymous')}</div>
+                        <a href="mailto:${escapeHtml(item.email)}" class="text-zinc-400 hover:text-amber-400 transition-colors text-[11px] block mt-0.5">${escapeHtml(item.email)}</a>
+                      </td>
+                      <td class="py-4 px-6 max-w-md">
+                        <div class="font-semibold text-zinc-200 text-xs mb-1 truncate">${escapeHtml(item.subject || 'General Inquiry')}</div>
+                        <div class="text-zinc-400 line-clamp-2 text-[11px] leading-relaxed">${escapeHtml(item.message || '')}</div>
+                      </td>
+                      <td class="py-4 px-6 text-zinc-400 whitespace-nowrap text-[11px]">
+                        ${item.created_at ? new Date(item.created_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true }) : 'Recently'}
+                      </td>
+                      <td class="py-4 px-6 whitespace-nowrap">
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${item.status === 'new' ? 'bg-amber-500/20 text-amber-400 border border-amber-500/40' : 'bg-zinc-800 text-zinc-400 border border-zinc-700/60'}">
+                          ${item.status === 'new' ? 'NEW' : 'READ'}
+                        </span>
+                      </td>
+                      <td class="py-4 px-6 text-right whitespace-nowrap">
+                        <div class="flex items-center justify-end gap-2">
+                          <button onclick="window.viewInquiry('${item.id}')" title="View Full Message" class="px-3 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-zinc-200 hover:text-zinc-100 border border-zinc-700/80 font-medium text-xs transition-colors">
+                            View
+                          </button>
+                          <a href="mailto:${encodeURIComponent(item.email)}?subject=${encodeURIComponent('Re: ' + (item.subject || 'Nexa Digital Support'))}" target="_blank" title="Reply via Email" class="p-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-amber-400 border border-zinc-700/80 transition-colors">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+                          </a>
+                          <button onclick="window.deleteInquiry('${item.id}')" title="Delete Inquiry" class="p-1.5 rounded-lg bg-zinc-900 hover:bg-red-500/20 text-zinc-400 hover:text-red-400 border border-zinc-700/80 transition-colors">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        `}
+      </div>
+    `;
+  }
+
+  function renderInquiryModal() {
+    const item = state.viewingInquiry;
+    if (!item) return '';
+
+    return `
+      <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md overflow-y-auto custom-scrollbar" onclick="window.closeInquiryModal()">
+        <div class="w-full max-w-2xl glass-card rounded-3xl border border-zinc-700/80 shadow-2xl overflow-hidden my-8" onclick="event.stopPropagation()">
+          <div class="p-6 border-b border-zinc-800 flex items-center justify-between bg-zinc-950">
+            <div>
+              <span class="text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full ${item.status === 'new' ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' : 'bg-zinc-800 text-zinc-400'}">
+                ${item.status === 'new' ? 'NEW MESSAGE' : 'MESSAGE'}
+              </span>
+              <h3 class="text-lg font-bold font-syne text-zinc-100 mt-1.5">${escapeHtml(item.subject || 'Inquiry Details')}</h3>
+            </div>
+            <button onclick="window.closeInquiryModal()" class="text-zinc-400 hover:text-zinc-100 p-2 rounded-xl hover:bg-zinc-900 transition-colors">
+              ✕
+            </button>
+          </div>
+
+          <div class="p-6 space-y-6">
+            <div class="grid sm:grid-cols-2 gap-4 bg-zinc-900/60 p-4 rounded-2xl border border-zinc-800">
+              <div>
+                <div class="text-[10px] uppercase font-bold text-zinc-400 tracking-wider">Sender Name</div>
+                <div class="text-sm font-semibold text-zinc-100 mt-0.5">${escapeHtml(item.name || 'Anonymous')}</div>
+              </div>
+              <div>
+                <div class="text-[10px] uppercase font-bold text-zinc-400 tracking-wider">Sender Email</div>
+                <a href="mailto:${escapeHtml(item.email)}" class="text-sm font-semibold text-amber-400 hover:underline mt-0.5 block break-all">${escapeHtml(item.email)}</a>
+              </div>
+              <div class="sm:col-span-2">
+                <div class="text-[10px] uppercase font-bold text-zinc-400 tracking-wider">Submitted On</div>
+                <div class="text-xs text-zinc-300 mt-0.5">${item.created_at ? new Date(item.created_at).toLocaleString() : 'N/A'}</div>
+              </div>
+            </div>
+
+            <div>
+              <div class="text-xs uppercase font-bold text-zinc-400 tracking-wider mb-2">Message Body</div>
+              <div class="bg-zinc-900/90 border border-zinc-800/80 rounded-2xl p-5 text-sm text-zinc-100 whitespace-pre-wrap leading-relaxed max-h-72 overflow-y-auto custom-scrollbar font-sans">
+${escapeHtml(item.message || '(No message content)')}
+              </div>
+            </div>
+          </div>
+
+          <div class="p-6 bg-zinc-950 border-t border-zinc-800 flex flex-wrap items-center justify-between gap-3">
+            <button onclick="window.deleteInquiry('${item.id}'); window.closeInquiryModal();" class="px-4 py-2 rounded-xl text-xs font-semibold text-red-400 hover:bg-red-500/10 border border-red-500/30 transition-colors">
+              Delete Message
+            </button>
+
+            <div class="flex items-center gap-3">
+              <button onclick="window.closeInquiryModal()" class="px-4 py-2 rounded-xl text-xs font-semibold text-zinc-400 hover:text-zinc-200 bg-zinc-900 hover:bg-zinc-800 transition-colors">
+                Close
+              </button>
+              <a href="mailto:${encodeURIComponent(item.email)}?subject=${encodeURIComponent('Re: ' + (item.subject || 'Nexa Digital Support'))}" target="_blank" class="px-5 py-2 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-400 text-zinc-950 transition-colors flex items-center gap-1.5">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+                <span>Reply via Email</span>
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+  }
 
   window.openNewToolModal = function () {
     state.isNewTool = true;
