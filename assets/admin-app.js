@@ -1978,8 +1978,14 @@
         body: JSON.stringify(t)
       });
       if (res && res.success) {
+        const savedTool = res.tool || t;
+        const idx = state.tools.findIndex(x => x.id === t.id || x.id === savedTool.id);
+        if (idx !== -1) {
+          state.tools[idx] = { ...state.tools[idx], ...savedTool };
+        }
         showToast('Tool updated & synced live!');
         state.editingTool = null;
+        render();
         await loadAllData();
       }
     }
