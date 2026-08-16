@@ -65,12 +65,14 @@
     options.headers = {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${state.token}`,
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+      'Pragma': 'no-cache',
       ...(options.headers || {})
     };
     try {
       const separator = endpoint.includes('?') ? '&' : '?';
-      const cacheBust = options.method && options.method !== 'GET' ? '' : `${separator}_=${Date.now()}`;
-      const res = await fetch(`${API_BASE}${endpoint}${cacheBust}`, options);
+      const cacheBust = `${separator}_=${Date.now()}`;
+      const res = await fetch(`${API_BASE}${endpoint}${cacheBust}`, { ...options, cache: 'no-store' });
       if (res.status === 401) {
         logout();
         return null;
@@ -2073,16 +2075,34 @@
       showToast(msg, 'error');
       return;
     }
-    showToast('Coupon saved!');
+    // *** DIRECTLY update state instead of re-fetching (prevents stale cache revert) ***
+    if (cp.id) {
+      // Edit: update existing coupon in state
+      const idx = state.coupons.findIndex(c => c.id === cp.id);
+      if (idx !== -1) {
+        state.coupons[idx] = { ...state.coupons[idx], ...cp };
+      }
+    } else {
+      // New: push the created coupon into state
+      const saved = result.coupon || cp;
+      state.coupons.push(saved);
+    }
+    showToast('Coupon saved successfully!');
     state.editingCoupon = null;
-    await loadAllData();
+    render();
   };
 
   window.deleteCouponConfirm = async function (id) {
     if (!confirm('Delete this coupon code?')) return;
-    await apiFetch(`/coupons/${id}`, { method: 'DELETE' });
+    const result = await apiFetch(`/coupons/${id}`, { method: 'DELETE' });
+    if (!result || result.success === false) {
+      showToast('Failed to delete coupon', 'error');
+      return;
+    }
+    // Directly remove from state (no re-fetch)
+    state.coupons = state.coupons.filter(c => c.id !== id);
     showToast('Coupon removed');
-    await loadAllData();
+    render();
   };
 
   // --- Freebie Modals ---

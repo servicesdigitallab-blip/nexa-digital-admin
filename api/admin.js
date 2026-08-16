@@ -43,8 +43,13 @@ function getLocalStore() {
 module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, Cache-Control, Pragma');
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate, max-age=0, s-maxage=0');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  res.setHeader('Surrogate-Control', 'no-store');
+  res.setHeader('CDN-Cache-Control', 'no-store');
+  res.setHeader('Vercel-CDN-Cache-Control', 'no-store');
 
   if (req.method === 'OPTIONS') return res.status(200).end();
 
@@ -608,7 +613,7 @@ module.exports = async (req, res) => {
         fs.writeFileSync(storePath, JSON.stringify(store, null, 2), 'utf8');
       } catch(e) {}
       
-      return res.status(200).json({ success: true });
+      return res.status(200).json({ success: true, coupon: { id, ...payload } });
     } catch(e) {
       console.error('PUT /coupons error:', e);
       return res.status(500).json({ success: false, message: e.message });
