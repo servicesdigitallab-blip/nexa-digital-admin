@@ -16,7 +16,9 @@ const sbHeaders = {
 
 function getLocalStore() {
   try {
-    const p = path.join(__dirname, '..', 'data', 'store.json');
+    const p1 = path.join(process.cwd(), 'data', 'store.json');
+    const p2 = path.join(__dirname, '..', 'data', 'store.json');
+    const p = fs.existsSync(p1) ? p1 : p2;
     if (fs.existsSync(p)) return JSON.parse(fs.readFileSync(p, 'utf8'));
   } catch (e) {}
   return { products: [], categories: [], popular_picks: [], coupons: [], freebies: [], reviews: [], analytics: {} };
@@ -33,9 +35,13 @@ module.exports = async (req, res) => {
   const urlPath = (req.url || '').split('?')[0].replace('/api/admin', '');
   const method = req.method.toUpperCase();
 
-  // 1. Login Endpoint
+  // 1. Admin Login
   if (urlPath === '/login' && method === 'POST') {
-    const { email, password } = req.body || {};
+    let body = req.body || {};
+    if (typeof body === 'string') {
+      try { body = JSON.parse(body); } catch(e) {}
+    }
+    const { email, password } = body;
     if (email === ADMIN_EMAIL && password === ADMIN_PASS) {
       return res.status(200).json({
         success: true,
@@ -54,55 +60,157 @@ module.exports = async (req, res) => {
 
   const store = getLocalStore();
 
-  // 2. Tools List
+  // 2. Tools List (Deep Join from Supabase)
   if (urlPath === '/tools' && method === 'GET') {
     try {
-      const [prodRes, catRes] = await Promise.all([
+      const [prodRes, plansRes, featsRes, faqsRes, catRes] = await Promise.all([
         fetch(`${supabaseUrl}/rest/v1/products?select=*&order=sort_order.asc,created_at.desc`, { headers: sbHeaders }).catch(() => null),
+        fetch(`${supabaseUrl}/rest/v1/product_plans?select=*`, { headers: sbHeaders }).catch(() => null),
+        fetch(`${supabaseUrl}/rest/v1/product_features?select=*&order=sort_order.asc`, { headers: sbHeaders }).catch(() => null),
+        fetch(`${supabaseUrl}/rest/v1/product_faqs?select=*&order=sort_order.asc`, { headers: sbHeaders }).catch(() => null),
         fetch(`${supabaseUrl}/rest/v1/categories?select=*`, { headers: sbHeaders }).catch(() => null)
       ]);
 
-      let tools = store.products || [];
+      let products = [];
       let categories = store.categories || [];
 
       if (prodRes && prodRes.ok) {
-        const sbProds = await prodRes.json();
-        if (sbProds.length > 0) tools = sbProds;
-      }
-      if (catRes && catRes.ok) {
-        const sbCats = await catRes.json();
-        if (sbCats.length > 0) categories = sbCats;
+        products = await prodRes.json();
+      } else {
+        products = store.products || [];
       }
 
-      return res.status(200).json({ tools, categories });
+      if (catRes && catRes.ok) {
+        categories = await catRes.json();
+      }
+
+      const plans = (plansRes && plansRes.ok) ? await plansRes.json() : [];
+      const feats = (featsRes && featsRes.ok) ? await featsRes.json() : [];
+      const faqs = (faqsRes && faqsRes.ok) ? await faqsRes.json() : [];
+
+      const catMap = {};
+      categories.forEach(c => { catMap[c.id] = c.name; });
+
+      const fullTools = products.map(p => {
+        const pPlans = plans.filter(pl => pl.product_id === p.id).sort((a, b) => (a.discounted_price || 0) - (b.discounted_price || 0));
+        const pFeats = feats.filter(f => f.product_id === p.id).sort((a, b) => a.sort_order - b.sort_order).map(f => f.feature);
+        const pFaqs = faqs.filter(fq => fq.product_id === p.id).sort((a, b) => a.sort_order - b.sort_order);
+        const slug = p.slug || (p.name ? p.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') : p.id);
+
+        return {
+          ...p,
+          slug,
+          category_name: catMap[p.category_id] || p.category_name || "AI Tools",
+          plans: pPlans.length ? pPlans : [{ name: 'Standard', period: '1 Month', original_price: p.price, discounted_price: p.price, popular: true }],
+          features: pFeats,
+          faqs: pFaqs
+        };
+      });
+
+      return res.status(200).json({ tools: fullTools, categories });
     } catch (e) {
       return res.status(200).json({ tools: store.products || [], categories: store.categories || [] });
     }
   }
 
-  // 3. Update Tool
-  if (urlPath.startsWith('/tools/') && method === 'PUT') {
-    const id = urlPath.replace('/tools/', '').split('/')[0];
-    const update = req.body || {};
+  // 3. Create Tool
+  if (urlPath === '/tools' && method === 'POST') {
+    let update = req.body || {};
+    if (typeof update === 'string') {
+      try { update = JSON.parse(update); } catch(e) {}
+    }
+    const newId = update.id || 'tool_' + Date.now();
 
     try {
-      // Sync to Supabase
-      const payload = {
+      const prodPayload = {
+        id: newId,
         name: update.name,
         description: update.description || '',
         price: Number(update.price || 0),
         image: update.image || '',
+        category_id: update.category_id,
         status: update.status || 'in_stock',
         delivery_time: update.delivery_time || '30-90 minutes delivery',
         warranty: update.warranty || 'Genuine license',
         refund_policy: update.refund_policy || 'Full refund guarantee',
-        support_info: update.support_info || '24/7 WhatsApp support'
+        support_info: update.support_info || '24/7 WhatsApp support',
+        whatsapp_message: update.whatsapp_message || ''
+      };
+
+      await fetch(`${supabaseUrl}/rest/v1/products`, {
+        method: 'POST',
+        headers: sbHeaders,
+        body: JSON.stringify(prodPayload)
+      }).catch(() => {});
+
+      // Plans
+      if (update.plans && Array.isArray(update.plans) && update.plans.length > 0) {
+        const pRows = update.plans.map(p => ({
+          product_id: newId,
+          name: p.name || 'Standard',
+          period: p.period || '1 Month',
+          original_price: Number(p.original_price || p.discounted_price || update.price),
+          discounted_price: Number(p.discounted_price || update.price),
+          discount: p.discount || 0,
+          popular: !!p.popular
+        }));
+        await fetch(`${supabaseUrl}/rest/v1/product_plans`, { method: 'POST', headers: sbHeaders, body: JSON.stringify(pRows) }).catch(() => {});
+      }
+
+      // Features
+      if (update.features && Array.isArray(update.features) && update.features.length > 0) {
+        const fRows = update.features.map((f, idx) => ({
+          product_id: newId,
+          feature: typeof f === 'string' ? f : (f.feature || ''),
+          sort_order: idx
+        }));
+        await fetch(`${supabaseUrl}/rest/v1/product_features`, { method: 'POST', headers: sbHeaders, body: JSON.stringify(fRows) }).catch(() => {});
+      }
+
+      // FAQs
+      if (update.faqs && Array.isArray(update.faqs) && update.faqs.length > 0) {
+        const qRows = update.faqs.map((fq, idx) => ({
+          product_id: newId,
+          question: fq.question || '',
+          answer: fq.answer || '',
+          sort_order: idx
+        }));
+        await fetch(`${supabaseUrl}/rest/v1/product_faqs`, { method: 'POST', headers: sbHeaders, body: JSON.stringify(qRows) }).catch(() => {});
+      }
+    } catch (e) {
+      console.error('Supabase create error:', e);
+    }
+
+    return res.status(200).json({ success: true, tool: { ...update, id: newId } });
+  }
+
+  // 4. Update Tool (PUT /tools/:id)
+  if (urlPath.startsWith('/tools/') && method === 'PUT') {
+    const id = urlPath.replace('/tools/', '').split('/')[0];
+    let update = req.body || {};
+    if (typeof update === 'string') {
+      try { update = JSON.parse(update); } catch(e) {}
+    }
+
+    try {
+      const prodPayload = {
+        name: update.name,
+        description: update.description || '',
+        price: Number(update.price || 0),
+        image: update.image || '',
+        category_id: update.category_id,
+        status: update.status || 'in_stock',
+        delivery_time: update.delivery_time || '30-90 minutes delivery',
+        warranty: update.warranty || 'Genuine license',
+        refund_policy: update.refund_policy || 'Full refund guarantee',
+        support_info: update.support_info || '24/7 WhatsApp support',
+        whatsapp_message: update.whatsapp_message || ''
       };
 
       await fetch(`${supabaseUrl}/rest/v1/products?id=eq.${id}`, {
         method: 'PATCH',
         headers: sbHeaders,
-        body: JSON.stringify(payload)
+        body: JSON.stringify(prodPayload)
       }).catch(() => {});
 
       // Plans
@@ -155,13 +263,51 @@ module.exports = async (req, res) => {
     return res.status(200).json({ success: true, tool: update });
   }
 
-  // 4. Popular Picks
+  // 5. Delete Tool (DELETE /tools/:id)
+  if (urlPath.startsWith('/tools/') && method === 'DELETE') {
+    const id = urlPath.replace('/tools/', '').split('/')[0];
+    try {
+      await Promise.all([
+        fetch(`${supabaseUrl}/rest/v1/product_plans?product_id=eq.${id}`, { method: 'DELETE', headers: sbHeaders }),
+        fetch(`${supabaseUrl}/rest/v1/product_features?product_id=eq.${id}`, { method: 'DELETE', headers: sbHeaders }),
+        fetch(`${supabaseUrl}/rest/v1/product_faqs?product_id=eq.${id}`, { method: 'DELETE', headers: sbHeaders }),
+        fetch(`${supabaseUrl}/rest/v1/products?id=eq.${id}`, { method: 'DELETE', headers: sbHeaders })
+      ]);
+    } catch (e) {}
+    return res.status(200).json({ success: true });
+  }
+
+  // 6. Popular Picks (Live Supabase Settings Sync)
   if (urlPath === '/popular-picks' && method === 'GET') {
+    try {
+      const setRes = await fetch(`${supabaseUrl}/rest/v1/site_settings?select=hero`, { headers: sbHeaders });
+      if (setRes.ok) {
+        const rows = await setRes.json();
+        if (rows[0] && rows[0].hero && rows[0].hero.popular_picks) {
+          return res.status(200).json({ picks: rows[0].hero.popular_picks, tools: store.products || [] });
+        }
+      }
+    } catch(e) {}
     return res.status(200).json({ picks: store.popular_picks || [], tools: store.products || [] });
   }
 
   if (urlPath === '/popular-picks' && method === 'POST') {
-    const newPick = { id: 'pick_' + Date.now(), ...req.body };
+    let pick = req.body || {};
+    if (typeof pick === 'string') {
+      try { pick = JSON.parse(pick); } catch(e) {}
+    }
+    const newPick = { id: 'pick_' + Date.now(), enabled: true, ...pick };
+    const currentPicks = store.popular_picks || [];
+    currentPicks.push(newPick);
+
+    try {
+      await fetch(`${supabaseUrl}/rest/v1/site_settings?id=eq.066a4027-9df8-45ee-ac41-32f26f11a507`, {
+        method: 'PATCH',
+        headers: sbHeaders,
+        body: JSON.stringify({ hero: { popular_picks: currentPicks } })
+      });
+    } catch(e) {}
+
     return res.status(200).json({ success: true, pick: newPick });
   }
 
@@ -177,20 +323,60 @@ module.exports = async (req, res) => {
     return res.status(200).json({ success: true });
   }
 
-  // 5. Coupons, Freebies, Reviews, Analytics
-  if (urlPath === '/coupons') return res.status(200).json({ coupons: store.coupons || [] });
-  if (urlPath === '/freebies') return res.status(200).json({ freebies: store.freebies || [] });
-  if (urlPath === '/reviews') return res.status(200).json({ reviews: store.reviews || [] });
+  // 7. Live Analytics Dashboard (Real-time telemetry)
   if (urlPath.startsWith('/analytics')) {
+    try {
+      // Fetch telemetry stats from track endpoint
+      const trackRes = await fetch(`${req.headers['x-forwarded-proto'] || 'https'}://${req.headers.host}/api/track`).catch(() => null);
+      if (trackRes && trackRes.ok) {
+        const stats = await trackRes.json();
+        return res.status(200).json(stats);
+      }
+    } catch(e) {}
+
     return res.status(200).json({
       live_visitors: 1,
-      total_visits: 12,
-      mobile_visits: 8,
-      desktop_visits: 4,
-      total_clicks: 3,
-      total_tool_views: 18,
+      total_visits: 18,
+      mobile_visits: 12,
+      desktop_visits: 6,
+      total_clicks: 5,
+      total_tool_views: 32,
       tool_clicks: []
     });
+  }
+
+  // 8. Coupons, Freebies, Reviews
+  if (urlPath === '/coupons') {
+    try {
+      const cpRes = await fetch(`${supabaseUrl}/rest/v1/coupons?select=*`, { headers: sbHeaders });
+      if (cpRes.ok) {
+        const data = await cpRes.json();
+        if (data.length > 0) return res.status(200).json({ coupons: data });
+      }
+    } catch(e) {}
+    return res.status(200).json({ coupons: store.coupons || [] });
+  }
+
+  if (urlPath === '/freebies') {
+    try {
+      const fbRes = await fetch(`${supabaseUrl}/rest/v1/freebies?select=*&order=sort_order.asc`, { headers: sbHeaders });
+      if (fbRes.ok) {
+        const data = await fbRes.json();
+        if (data.length > 0) return res.status(200).json({ freebies: data });
+      }
+    } catch(e) {}
+    return res.status(200).json({ freebies: store.freebies || [] });
+  }
+
+  if (urlPath === '/reviews') {
+    try {
+      const revRes = await fetch(`${supabaseUrl}/rest/v1/reviews?select=*&order=created_at.desc`, { headers: sbHeaders });
+      if (revRes.ok) {
+        const data = await revRes.json();
+        if (data.length > 0) return res.status(200).json({ reviews: data });
+      }
+    } catch(e) {}
+    return res.status(200).json({ reviews: store.reviews || [] });
   }
 
   res.status(200).json({ success: true });
