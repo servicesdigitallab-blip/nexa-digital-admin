@@ -20,12 +20,13 @@ function isUUID(str) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
 }
 
+const p1 = path.join(process.cwd(), 'data', 'store.json');
+const p2 = path.join(__dirname, '..', 'data', 'store.json');
+const storePath = fs.existsSync(p1) ? p1 : p2;
+
 function getLocalStore() {
   try {
-    const p1 = path.join(process.cwd(), 'data', 'store.json');
-    const p2 = path.join(__dirname, '..', 'data', 'store.json');
-    const p = fs.existsSync(p1) ? p1 : p2;
-    if (fs.existsSync(p)) return JSON.parse(fs.readFileSync(p, 'utf8'));
+    if (fs.existsSync(storePath)) return JSON.parse(fs.readFileSync(storePath, 'utf8'));
   } catch (e) {}
   return { products: [], categories: [], popular_picks: [], coupons: [], freebies: [], reviews: [], analytics: {} };
 }
@@ -505,38 +506,379 @@ module.exports = async (req, res) => {
     });
   }
 
-  // 8. Coupons, Freebies, Reviews
-  if (urlPath === '/coupons') {
+  // 8. Coupons
+  if (urlPath === '/coupons' && method === 'GET') {
     try {
       const cpRes = await fetch(`${supabaseUrl}/rest/v1/coupons?select=*`, { headers: sbHeaders });
       if (cpRes.ok) {
         const data = await cpRes.json();
-        if (data.length > 0) return res.status(200).json({ coupons: data });
+        return res.status(200).json({ coupons: data });
       }
     } catch(e) {}
     return res.status(200).json({ coupons: store.coupons || [] });
   }
 
-  if (urlPath === '/freebies') {
+  if (urlPath === '/coupons' && method === 'POST') {
+    try {
+      let body = req.body || {};
+      if (typeof body === 'string') {
+        try { body = JSON.parse(body); } catch(e) {}
+      }
+      const newId = isUUID(body.id) ? body.id : crypto.randomUUID();
+      const payload = {
+        id: newId,
+        code: body.code,
+        discount_type: body.discount_type || 'percentage',
+        discount_value: Number(body.discount_value !== undefined ? body.discount_value : 20),
+        scope: body.scope || 'all',
+        applicable_tools: Array.isArray(body.applicable_tools) ? body.applicable_tools : [],
+        is_active: body.is_active !== false
+      };
+      
+      const sRes = await fetch(`${supabaseUrl}/rest/v1/coupons`, {
+        method: 'POST',
+        headers: sbHeaders,
+        body: JSON.stringify(payload)
+      });
+      
+      if (!sRes.ok) {
+        const errText = await sRes.text();
+        console.error('Supabase coupon create error:', errText);
+        return res.status(500).json({ success: false, message: 'Database save failed: ' + errText });
+      }
+      
+      // Update local store fallback (try-catch because Vercel is read-only)
+      try {
+        store.coupons = store.coupons || [];
+        store.coupons.push(payload);
+        fs.writeFileSync(storePath, JSON.stringify(store, null, 2), 'utf8');
+      } catch(e) {}
+      
+      return res.status(200).json({ success: true, coupon: payload });
+    } catch(e) {
+      console.error('POST /coupons error:', e);
+      return res.status(500).json({ success: false, message: e.message });
+    }
+  }
+
+  if (urlPath.startsWith('/coupons/') && method === 'PUT') {
+    try {
+      const id = urlPath.replace('/coupons/', '').split('/')[0];
+      let body = req.body || {};
+      if (typeof body === 'string') {
+        try { body = JSON.parse(body); } catch(e) {}
+      }
+      
+      const payload = {};
+      if (body.code !== undefined) payload.code = body.code;
+      if (body.discount_type !== undefined) payload.discount_type = body.discount_type;
+      if (body.discount_value !== undefined) payload.discount_value = Number(body.discount_value);
+      if (body.scope !== undefined) payload.scope = body.scope;
+      if (body.applicable_tools !== undefined) payload.applicable_tools = Array.isArray(body.applicable_tools) ? body.applicable_tools : [];
+      if (body.is_active !== undefined) payload.is_active = body.is_active !== false;
+      
+      const sRes = await fetch(`${supabaseUrl}/rest/v1/coupons?id=eq.${id}`, {
+        method: 'PATCH',
+        headers: sbHeaders,
+        body: JSON.stringify(payload)
+      });
+      
+      if (!sRes.ok) {
+        const errText = await sRes.text();
+        console.error('Supabase coupon update error:', errText);
+        return res.status(500).json({ success: false, message: 'Database update failed: ' + errText });
+      }
+      
+      // Update local store fallback
+      try {
+        store.coupons = store.coupons || [];
+        const idx = store.coupons.findIndex(c => c.id === id);
+        if (idx !== -1) {
+          store.coupons[idx] = { ...store.coupons[idx], ...payload };
+        }
+        fs.writeFileSync(storePath, JSON.stringify(store, null, 2), 'utf8');
+      } catch(e) {}
+      
+      return res.status(200).json({ success: true });
+    } catch(e) {
+      console.error('PUT /coupons error:', e);
+      return res.status(500).json({ success: false, message: e.message });
+    }
+  }
+
+  if (urlPath.startsWith('/coupons/') && method === 'DELETE') {
+    try {
+      const id = urlPath.replace('/coupons/', '').split('/')[0];
+      const sRes = await fetch(`${supabaseUrl}/rest/v1/coupons?id=eq.${id}`, {
+        method: 'DELETE',
+        headers: sbHeaders
+      });
+      
+      if (!sRes.ok) {
+        const errText = await sRes.text();
+        console.error('Supabase coupon delete error:', errText);
+        return res.status(500).json({ success: false, message: 'Database delete failed: ' + errText });
+      }
+      
+      // Update local store fallback
+      try {
+        store.coupons = (store.coupons || []).filter(c => c.id !== id);
+        fs.writeFileSync(storePath, JSON.stringify(store, null, 2), 'utf8');
+      } catch(e) {}
+      
+      return res.status(200).json({ success: true });
+    } catch(e) {
+      console.error('DELETE /coupons error:', e);
+      return res.status(500).json({ success: false, message: e.message });
+    }
+  }
+
+  // 9. Freebies
+  if (urlPath === '/freebies' && method === 'GET') {
     try {
       const fbRes = await fetch(`${supabaseUrl}/rest/v1/freebies?select=*&order=sort_order.asc`, { headers: sbHeaders });
       if (fbRes.ok) {
         const data = await fbRes.json();
-        if (data.length > 0) return res.status(200).json({ freebies: data });
+        return res.status(200).json({ freebies: data });
       }
     } catch(e) {}
     return res.status(200).json({ freebies: store.freebies || [] });
   }
 
-  if (urlPath === '/reviews') {
+  if (urlPath === '/freebies' && method === 'POST') {
+    try {
+      let body = req.body || {};
+      if (typeof body === 'string') {
+        try { body = JSON.parse(body); } catch(e) {}
+      }
+      const newId = isUUID(body.id) ? body.id : crypto.randomUUID();
+      const payload = {
+        id: newId,
+        name: body.name,
+        category: body.category || 'Editing Packs',
+        description: body.description || '',
+        image: body.image || '',
+        download_url: body.download_url || '',
+        features: Array.isArray(body.features) ? body.features : null,
+        sort_order: Number(body.sort_order || 0)
+      };
+      
+      const sRes = await fetch(`${supabaseUrl}/rest/v1/freebies`, {
+        method: 'POST',
+        headers: sbHeaders,
+        body: JSON.stringify(payload)
+      });
+      
+      if (!sRes.ok) {
+        const errText = await sRes.text();
+        console.error('Supabase freebie create error:', errText);
+        return res.status(500).json({ success: false, message: 'Database save failed: ' + errText });
+      }
+      
+      try {
+        store.freebies = store.freebies || [];
+        store.freebies.push(payload);
+        fs.writeFileSync(storePath, JSON.stringify(store, null, 2), 'utf8');
+      } catch(e) {}
+      
+      return res.status(200).json({ success: true, freebie: payload });
+    } catch(e) {
+      console.error('POST /freebies error:', e);
+      return res.status(500).json({ success: false, message: e.message });
+    }
+  }
+
+  if (urlPath.startsWith('/freebies/') && method === 'PUT') {
+    try {
+      const id = urlPath.replace('/freebies/', '').split('/')[0];
+      let body = req.body || {};
+      if (typeof body === 'string') {
+        try { body = JSON.parse(body); } catch(e) {}
+      }
+      
+      const payload = {};
+      if (body.name !== undefined) payload.name = body.name;
+      if (body.category !== undefined) payload.category = body.category;
+      if (body.description !== undefined) payload.description = body.description;
+      if (body.image !== undefined) payload.image = body.image;
+      if (body.download_url !== undefined) payload.download_url = body.download_url;
+      if (body.features !== undefined) payload.features = Array.isArray(body.features) ? body.features : null;
+      if (body.sort_order !== undefined) payload.sort_order = Number(body.sort_order);
+      
+      const sRes = await fetch(`${supabaseUrl}/rest/v1/freebies?id=eq.${id}`, {
+        method: 'PATCH',
+        headers: sbHeaders,
+        body: JSON.stringify(payload)
+      });
+      
+      if (!sRes.ok) {
+        const errText = await sRes.text();
+        console.error('Supabase freebie update error:', errText);
+        return res.status(500).json({ success: false, message: 'Database update failed: ' + errText });
+      }
+      
+      try {
+        store.freebies = store.freebies || [];
+        const idx = store.freebies.findIndex(f => f.id === id);
+        if (idx !== -1) {
+          store.freebies[idx] = { ...store.freebies[idx], ...payload };
+        }
+        fs.writeFileSync(storePath, JSON.stringify(store, null, 2), 'utf8');
+      } catch(e) {}
+      
+      return res.status(200).json({ success: true });
+    } catch(e) {
+      console.error('PUT /freebies error:', e);
+      return res.status(500).json({ success: false, message: e.message });
+    }
+  }
+
+  if (urlPath.startsWith('/freebies/') && method === 'DELETE') {
+    try {
+      const id = urlPath.replace('/freebies/', '').split('/')[0];
+      const sRes = await fetch(`${supabaseUrl}/rest/v1/freebies?id=eq.${id}`, {
+        method: 'DELETE',
+        headers: sbHeaders
+      });
+      
+      if (!sRes.ok) {
+        const errText = await sRes.text();
+        console.error('Supabase freebie delete error:', errText);
+        return res.status(500).json({ success: false, message: 'Database delete failed: ' + errText });
+      }
+      
+      try {
+        store.freebies = (store.freebies || []).filter(f => f.id !== id);
+        fs.writeFileSync(storePath, JSON.stringify(store, null, 2), 'utf8');
+      } catch(e) {}
+      
+      return res.status(200).json({ success: true });
+    } catch(e) {
+      console.error('DELETE /freebies error:', e);
+      return res.status(500).json({ success: false, message: e.message });
+    }
+  }
+
+  // 10. Reviews
+  if (urlPath === '/reviews' && method === 'GET') {
     try {
       const revRes = await fetch(`${supabaseUrl}/rest/v1/reviews?select=*&order=created_at.desc`, { headers: sbHeaders });
       if (revRes.ok) {
         const data = await revRes.json();
-        if (data.length > 0) return res.status(200).json({ reviews: data });
+        return res.status(200).json({ reviews: data });
       }
     } catch(e) {}
     return res.status(200).json({ reviews: store.reviews || [] });
+  }
+
+  if (urlPath === '/reviews' && method === 'POST') {
+    try {
+      let body = req.body || {};
+      if (typeof body === 'string') {
+        try { body = JSON.parse(body); } catch(e) {}
+      }
+      const newId = isUUID(body.id) ? body.id : crypto.randomUUID();
+      const payload = {
+        id: newId,
+        name: body.name,
+        role: body.role || 'Content Creator',
+        rating: Number(body.rating || 5),
+        content: body.content,
+        avatar_url: body.avatar_url || ''
+      };
+      
+      const sRes = await fetch(`${supabaseUrl}/rest/v1/reviews`, {
+        method: 'POST',
+        headers: sbHeaders,
+        body: JSON.stringify(payload)
+      });
+      
+      if (!sRes.ok) {
+        const errText = await sRes.text();
+        console.error('Supabase review create error:', errText);
+        return res.status(500).json({ success: false, message: 'Database save failed: ' + errText });
+      }
+      
+      try {
+        store.reviews = store.reviews || [];
+        store.reviews.push(payload);
+        fs.writeFileSync(storePath, JSON.stringify(store, null, 2), 'utf8');
+      } catch(e) {}
+      
+      return res.status(200).json({ success: true, review: payload });
+    } catch(e) {
+      console.error('POST /reviews error:', e);
+      return res.status(500).json({ success: false, message: e.message });
+    }
+  }
+
+  if (urlPath.startsWith('/reviews/') && method === 'PUT') {
+    try {
+      const id = urlPath.replace('/reviews/', '').split('/')[0];
+      let body = req.body || {};
+      if (typeof body === 'string') {
+        try { body = JSON.parse(body); } catch(e) {}
+      }
+      
+      const payload = {};
+      if (body.name !== undefined) payload.name = body.name;
+      if (body.role !== undefined) payload.role = body.role;
+      if (body.rating !== undefined) payload.rating = Number(body.rating);
+      if (body.content !== undefined) payload.content = body.content;
+      if (body.avatar_url !== undefined) payload.avatar_url = body.avatar_url;
+      
+      const sRes = await fetch(`${supabaseUrl}/rest/v1/reviews?id=eq.${id}`, {
+        method: 'PATCH',
+        headers: sbHeaders,
+        body: JSON.stringify(payload)
+      });
+      
+      if (!sRes.ok) {
+        const errText = await sRes.text();
+        console.error('Supabase review update error:', errText);
+        return res.status(500).json({ success: false, message: 'Database update failed: ' + errText });
+      }
+      
+      try {
+        store.reviews = store.reviews || [];
+        const idx = store.reviews.findIndex(r => r.id === id);
+        if (idx !== -1) {
+          store.reviews[idx] = { ...store.reviews[idx], ...payload };
+        }
+        fs.writeFileSync(storePath, JSON.stringify(store, null, 2), 'utf8');
+      } catch(e) {}
+      
+      return res.status(200).json({ success: true });
+    } catch(e) {
+      console.error('PUT /reviews error:', e);
+      return res.status(500).json({ success: false, message: e.message });
+    }
+  }
+
+  if (urlPath.startsWith('/reviews/') && method === 'DELETE') {
+    try {
+      const id = urlPath.replace('/reviews/', '').split('/')[0];
+      const sRes = await fetch(`${supabaseUrl}/rest/v1/reviews?id=eq.${id}`, {
+        method: 'DELETE',
+        headers: sbHeaders
+      });
+      
+      if (!sRes.ok) {
+        const errText = await sRes.text();
+        console.error('Supabase review delete error:', errText);
+        return res.status(500).json({ success: false, message: 'Database delete failed: ' + errText });
+      }
+      
+      try {
+        store.reviews = (store.reviews || []).filter(r => r.id !== id);
+        fs.writeFileSync(storePath, JSON.stringify(store, null, 2), 'utf8');
+      } catch(e) {}
+      
+      return res.status(200).json({ success: true });
+    } catch(e) {
+      console.error('DELETE /reviews error:', e);
+      return res.status(500).json({ success: false, message: e.message });
+    }
   }
 
   res.status(200).json({ success: true });
