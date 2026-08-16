@@ -315,16 +315,30 @@ module.exports = async (req, res) => {
 
   // 6. Popular Picks
   if (urlPath === '/popular-picks' && method === 'GET') {
+    let finalPicks = store.popular_picks || [];
     try {
       const setRes = await fetch(`${supabaseUrl}/rest/v1/site_settings?id=eq.${SETTINGS_ID}&select=hero`, { headers: sbHeaders });
       if (setRes.ok) {
         const rows = await setRes.json();
         if (rows[0] && rows[0].hero && rows[0].hero.popular_picks) {
-          return res.status(200).json({ picks: rows[0].hero.popular_picks, tools: store.products || [] });
+          const pIds = rows[0].hero.popular_picks;
+          // Map string IDs to full objects that the admin panel expects
+          finalPicks = pIds.map((id, idx) => {
+            const tool = (store.products || []).find(t => t.id === id || t.slug === id) || {};
+            return {
+              id: 'pick_' + idx,
+              product_id: tool.id || id,
+              name: tool.name || 'Unknown',
+              category_name: tool.category_name || 'AI Tools',
+              price: tool.price || 0,
+              icon_url: tool.image || '',
+              enabled: true
+            };
+          });
         }
       }
     } catch(e) {}
-    return res.status(200).json({ picks: store.popular_picks || [], tools: store.products || [] });
+    return res.status(200).json({ picks: finalPicks, tools: store.products || [] });
   }
 
   
