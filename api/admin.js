@@ -528,7 +528,7 @@ module.exports = async (req, res) => {
       const payload = {
         id: newId,
         code: body.code,
-        discount_type: body.discount_type || 'percentage',
+        discount_type: body.discount_type || 'percent',
         discount_value: Number(body.discount_value !== undefined ? body.discount_value : 20),
         scope: body.scope || 'all',
         applicable_tools: Array.isArray(body.applicable_tools) ? body.applicable_tools : [],
