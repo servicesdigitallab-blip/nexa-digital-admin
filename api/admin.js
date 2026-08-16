@@ -327,6 +327,84 @@ module.exports = async (req, res) => {
     return res.status(200).json({ picks: store.popular_picks || [], tools: store.products || [] });
   }
 
+  
+  // --- Popular Picks Management (Admin -> Storefront Sync) ---
+  if (urlPath === '/popular-picks' && method === 'POST') {
+    let picks = store.popular_picks || [];
+    const newPick = { ...req.body, id: 'pick_' + Date.now() };
+    picks.push(newPick);
+    store.popular_picks = picks;
+    fs.writeFileSync(storePath, JSON.stringify(store, null, 2), 'utf8');
+    
+    // Sync to Supabase site_settings
+    try {
+      const pIds = picks.map(p => p.product_id).filter(Boolean);
+      const setRes = await fetch(`${supabaseUrl}/rest/v1/site_settings?id=eq.${SETTINGS_ID}&select=hero`, { headers: sbHeaders });
+      if (setRes.ok) {
+        const rows = await setRes.json();
+        const hero = (rows[0] && rows[0].hero) || {};
+        hero.popular_picks = pIds;
+        await fetch(`${supabaseUrl}/rest/v1/site_settings?id=eq.${SETTINGS_ID}`, {
+          method: 'PATCH', headers: sbHeaders, body: JSON.stringify({ hero })
+        });
+      }
+    } catch(e) {}
+    
+    return res.status(200).json({ success: true, picks });
+  }
+
+  if (urlPath.startsWith('/popular-picks/') && (method === 'PUT' || method === 'DELETE')) {
+    const pId = urlPath.split('/').pop();
+    let picks = store.popular_picks || [];
+    
+    if (method === 'PUT') {
+      const idx = picks.findIndex(p => p.id === pId);
+      if (idx !== -1) {
+        picks[idx] = { ...picks[idx], ...req.body, id: pId };
+      }
+    } else if (method === 'DELETE') {
+      picks = picks.filter(p => p.id !== pId);
+    }
+    
+    store.popular_picks = picks;
+    fs.writeFileSync(storePath, JSON.stringify(store, null, 2), 'utf8');
+    
+    try {
+      const pIds = picks.map(p => p.product_id).filter(Boolean);
+      const setRes = await fetch(`${supabaseUrl}/rest/v1/site_settings?id=eq.${SETTINGS_ID}&select=hero`, { headers: sbHeaders });
+      if (setRes.ok) {
+        const rows = await setRes.json();
+        const hero = (rows[0] && rows[0].hero) || {};
+        hero.popular_picks = pIds;
+        await fetch(`${supabaseUrl}/rest/v1/site_settings?id=eq.${SETTINGS_ID}`, {
+          method: 'PATCH', headers: sbHeaders, body: JSON.stringify({ hero })
+        });
+      }
+    } catch(e) {}
+    
+    return res.status(200).json({ success: true, picks });
+  }
+
+  if (urlPath === '/popular-picks-reorder' && method === 'PUT') {
+    store.popular_picks = req.body;
+    fs.writeFileSync(storePath, JSON.stringify(store, null, 2), 'utf8');
+    
+    try {
+      const pIds = req.body.map(p => p.product_id).filter(Boolean);
+      const setRes = await fetch(`${supabaseUrl}/rest/v1/site_settings?id=eq.${SETTINGS_ID}&select=hero`, { headers: sbHeaders });
+      if (setRes.ok) {
+        const rows = await setRes.json();
+        const hero = (rows[0] && rows[0].hero) || {};
+        hero.popular_picks = pIds;
+        await fetch(`${supabaseUrl}/rest/v1/site_settings?id=eq.${SETTINGS_ID}`, {
+          method: 'PATCH', headers: sbHeaders, body: JSON.stringify({ hero })
+        });
+      }
+    } catch(e) {}
+    
+    return res.status(200).json({ success: true });
+  }
+
   // 7. Live Cloud-Persistent Analytics Dashboard
   if (urlPath.startsWith('/analytics')) {
     try {
