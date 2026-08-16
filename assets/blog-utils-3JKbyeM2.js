@@ -1,0 +1,1 @@
+const a=e=>e.toLowerCase().trim().replace(/[^\w\s-]/g,"").replace(/[\s_-]+/g,"-").replace(/^-+|-+$/g,""),c=e=>{const t=e.replace(/<[^>]+>/g," ").replace(/\s+/g," ").trim(),r=t?t.split(" ").length:0;return Math.max(1,Math.ceil(r/200))},s=e=>e?new Date(e).toLocaleDateString("en-US",{year:"numeric",month:"short",day:"numeric"}):"";export{c,s as f,a as s};

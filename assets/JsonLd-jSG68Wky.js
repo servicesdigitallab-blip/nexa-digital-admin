@@ -1,0 +1,1 @@
+import{r as d}from"./index-DZT4_D0V.js";const l=({id:n,data:o})=>(d.useEffect(()=>{const t=`jsonld-${n}`;let e=document.getElementById(t);return e||(e=document.createElement("script"),e.type="application/ld+json",e.id=t,document.head.appendChild(e)),e.text=JSON.stringify(o),()=>{const r=document.getElementById(t);r&&r.remove()}},[n,o]),null);export{l as J};

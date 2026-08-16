@@ -1,0 +1,1 @@
+const e=(t,a)=>a?a.discount_type==="percent"?Math.max(0,Math.round(t-t*Number(a.discount_value)/100)):Math.max(0,Math.round(t-Number(a.discount_value))):t,u=t=>t.discount_type==="percent"?`${t.discount_value}% off`:`${t.discount_value} off`;export{e as a,u as c};
