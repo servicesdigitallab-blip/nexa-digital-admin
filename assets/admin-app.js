@@ -2052,14 +2052,26 @@
 
   window.saveCouponModal = async function () {
     const cp = state.editingCoupon;
-    if (!cp.code) {
-      showToast('Coupon code is required', 'error');
+    if (!cp.code || cp.code.trim().length < 2) {
+      showToast('Coupon code is required (min 2 characters)', 'error');
       return;
     }
+    let result;
     if (cp.id) {
-      await apiFetch(`/coupons/${cp.id}`, { method: 'PUT', body: JSON.stringify(cp) });
+      result = await apiFetch(`/coupons/${cp.id}`, { method: 'PUT', body: JSON.stringify(cp) });
     } else {
-      await apiFetch('/coupons', { method: 'POST', body: JSON.stringify(cp) });
+      result = await apiFetch('/coupons', { method: 'POST', body: JSON.stringify(cp) });
+    }
+    if (!result) {
+      showToast('Failed to save coupon — check your connection', 'error');
+      return;
+    }
+    if (result.success === false) {
+      const msg = (result.message || '').includes('duplicate') 
+        ? 'This coupon code already exists! Use a different code.' 
+        : (result.message || 'Failed to save coupon');
+      showToast(msg, 'error');
+      return;
     }
     showToast('Coupon saved!');
     state.editingCoupon = null;
