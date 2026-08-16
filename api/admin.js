@@ -2,6 +2,12 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 
+// Prevent Vercel edge caching by wrapping global fetch
+const originalFetch = global.fetch;
+global.fetch = function(url, options = {}) {
+  return originalFetch(url, { ...options, cache: 'no-store' });
+};
+
 const ADMIN_EMAIL = 'nexadigitaltoools@gmail.com';
 const ADMIN_PASS = 'fahad3344';
 const JWT_TOKEN = 'nexa_jwt_token_fahad_3344_secure';
