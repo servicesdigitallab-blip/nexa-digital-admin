@@ -74,7 +74,7 @@
   <meta name="twitter:title" content="Nexa Digital — Your Trusted Source for Digital Subscriptions">
   <meta property="og:description" content="Nexa Digital — AI, SEO &amp; Creative subscriptions delivered instantly, backed by support. Verified, secure, and affordable digital tools.">
   <meta name="twitter:description" content="Nexa Digital — AI, SEO &amp; Creative subscriptions delivered instantly, backed by support. Verified, secure, and affordable digital tools.">
-  <script type="module" crossorigin src="/assets/app-nexa-store.js"></script>
+  <script type="module" crossorigin src="/assets/index-DZT4_D0V.js"></script>
   <link rel="stylesheet" crossorigin href="/assets/index-g2WHYVtL.css">
 </head>
   <body>
