@@ -496,6 +496,28 @@ module.exports = async (req, res) => {
         const rows = await setRes.json();
         if (rows[0] && rows[0].about && rows[0].about.analytics) {
           const stats = rows[0].about.analytics;
+          
+          // Aggregate individual clicks into grouped format for UI
+          const rawClicks = stats.tool_clicks || [];
+          const aggClicks = {};
+          rawClicks.forEach(c => {
+            const tId = c.toolId || 'unknown';
+            if (!aggClicks[tId]) {
+              aggClicks[tId] = {
+                id: tId,
+                name: c.toolName || tId,
+                category: 'Tool',
+                views: 1, // We don't have individual views by tool, so just placeholder
+                clicks: 0,
+                plan_breakdown: {}
+              };
+            }
+            aggClicks[tId].clicks += 1;
+            const p = c.planName || 'Standard';
+            aggClicks[tId].plan_breakdown[p] = (aggClicks[tId].plan_breakdown[p] || 0) + 1;
+          });
+          const sortedClicks = Object.values(aggClicks).sort((a,b) => b.clicks - a.clicks);
+
           return res.status(200).json({
             live_visitors: 1,
             total_visits: stats.total_visits || 1,
@@ -503,7 +525,7 @@ module.exports = async (req, res) => {
             desktop_visits: stats.desktop_visits || 1,
             total_clicks: stats.total_clicks || 0,
             total_tool_views: stats.total_tool_views || 0,
-            tool_clicks: stats.tool_clicks || []
+            tool_clicks: sortedClicks
           });
         }
       }

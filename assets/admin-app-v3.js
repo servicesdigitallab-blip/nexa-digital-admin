@@ -37,6 +37,8 @@
     toast: null
   };
 
+  window.state = state;
+
   
   function broadcastSync() {
     try {
