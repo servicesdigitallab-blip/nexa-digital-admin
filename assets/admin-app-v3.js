@@ -147,14 +147,22 @@
 
   // --- Real-time Polling for Live Visitors ---
   setInterval(async () => {
-    if (state.token && state.activeTab === 'dashboard') {
-      const analytics = await apiFetch(`/analytics?range=${state.timeRange}`);
-      if (analytics) {
-        state.analytics = analytics;
-        render();
+    if (state.token) {
+      if (state.activeTab === 'dashboard') {
+        const analytics = await apiFetch(`/analytics?range=${state.timeRange}`);
+        if (analytics) {
+          state.analytics = analytics;
+          render();
+        }
+      } else if (state.activeTab === 'inquiries') {
+        const inq = await apiFetch('/contact-inquiries');
+        if (inq && inq.inquiries) {
+          state.inquiries = inq.inquiries;
+          render();
+        }
       }
     }
-  }, 5000);
+  }, 4000);
 
   // --- SVG Icons Helper ---
   const icons = {
@@ -1526,9 +1534,27 @@
   }
 
   // --- Global Window Handler Attachments ---
-  window.switchTab = function (tab) {
+  window.switchTab = async function (tab) {
     state.activeTab = tab;
+    state.searchQuery = '';
     render();
+    if (tab === 'inquiries') {
+      try {
+        const res = await apiFetch('/contact-inquiries');
+        if (res && res.inquiries) {
+          state.inquiries = res.inquiries;
+          render();
+        }
+      } catch(e) {}
+    } else if (tab === 'dashboard') {
+      try {
+        const res = await apiFetch('/analytics?range=' + state.timeRange);
+        if (res) {
+          state.analytics = res;
+          render();
+        }
+      } catch(e) {}
+    }
   };
 
   window.setTimeRange = async function (range) {
@@ -2485,6 +2511,59 @@ ${escapeHtml(item.message || '(No message content)')}
 
   window.closeReviewModal = function () {
     state.editingReview = null;
+    render();
+  };
+
+  window.viewInquiry = async function (id) {
+    const item = (state.inquiries || []).find(i => i.id === id);
+    if (item) {
+      state.viewingInquiry = item;
+      render();
+      if (item.status === 'new') {
+        item.status = 'read';
+        try {
+          await apiFetch('/contact-inquiries/' + id + '/read', { method: 'PUT' });
+        } catch(e) {}
+      }
+    }
+  };
+
+  window.closeInquiryModal = function () {
+    state.viewingInquiry = null;
+    render();
+  };
+
+  window.markInquiryRead = async function (id) {
+    const item = (state.inquiries || []).find(i => i.id === id);
+    if (item) {
+      item.status = 'read';
+      render();
+      try {
+        await apiFetch('/contact-inquiries/' + id + '/read', { method: 'PUT' });
+        showToast('Inquiry marked as read', 'success');
+      } catch(e) {}
+    }
+  };
+
+  window.deleteInquiry = async function (id) {
+    if (!confirm('Are you sure you want to delete this inquiry?')) return;
+    state.inquiries = (state.inquiries || []).filter(i => i.id !== id);
+    if (state.viewingInquiry && state.viewingInquiry.id === id) {
+      state.viewingInquiry = null;
+    }
+    render();
+    try {
+      const res = await apiFetch('/contact-inquiries/' + id, { method: 'DELETE' });
+      if (res && res.success) {
+        showToast('Inquiry deleted successfully', 'success');
+      }
+    } catch(e) {}
+  };
+
+  window.logoutAdmin = function () {
+    localStorage.removeItem('nexa_admin_token');
+    state.token = null;
+    state.user = null;
     render();
   };
 
