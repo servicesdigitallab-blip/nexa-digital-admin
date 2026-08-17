@@ -491,7 +491,9 @@ module.exports = async (req, res) => {
   // 7. Live Cloud-Persistent Analytics Dashboard
   if (urlPath.startsWith('/analytics')) {
     const query = new URL('http://x' + req.url).searchParams;
-    const range = query.get('range') || 'all';
+    const range = query.get('range') || 'today';
+    const querySince = query.get('since');
+    const queryUntil = query.get('until');
 
     try {
       const setRes = await fetch(`${supabaseUrl}/rest/v1/site_settings?id=eq.${SETTINGS_ID}&select=about`, { headers: sbHeaders });
@@ -505,20 +507,55 @@ module.exports = async (req, res) => {
           // Calculate time boundary
           const now = Date.now();
           let since = 0;
-          if (range === 'today') {
-            const d = new Date();
-            d.setHours(0, 0, 0, 0);
-            since = d.getTime();
-          } else if (range === 'week') {
-            const d = new Date();
-            d.setDate(d.getDate() - d.getDay());
-            d.setHours(0, 0, 0, 0);
-            since = d.getTime();
-          }
-          // range === 'all' means since = 0, include everything
+          let until = Infinity;
 
-          const filteredEvents = since > 0 ? allEvents.filter(e => (e.ts || 0) >= since) : allEvents;
-          const filteredClicks = since > 0 ? allClicks.filter(c => (c.timestamp || 0) >= since) : allClicks;
+          if (querySince !== null && querySince !== undefined && querySince !== '') {
+            since = parseInt(querySince, 10) || 0;
+            if (queryUntil !== null && queryUntil !== undefined && queryUntil !== '' && queryUntil !== 'Infinity') {
+              until = parseInt(queryUntil, 10) || Infinity;
+            }
+          } else {
+            const d = new Date();
+            if (range === 'today') {
+              d.setHours(0, 0, 0, 0);
+              since = d.getTime();
+              until = Infinity;
+            } else if (range === 'yesterday') {
+              d.setHours(0, 0, 0, 0);
+              until = d.getTime();
+              d.setDate(d.getDate() - 1);
+              since = d.getTime();
+            } else if (range === 'this_week' || range === 'week') {
+              const day = d.getDay() || 7;
+              d.setHours(0, 0, 0, 0);
+              d.setDate(d.getDate() - (day - 1));
+              since = d.getTime();
+              until = Infinity;
+            } else if (range === 'last_week') {
+              const day = d.getDay() || 7;
+              d.setHours(0, 0, 0, 0);
+              d.setDate(d.getDate() - (day - 1));
+              until = d.getTime();
+              d.setDate(d.getDate() - 7);
+              since = d.getTime();
+            } else if (range === 'month' || range === 'last_30_days' || range === '1month') {
+              since = now - (30 * 24 * 60 * 60 * 1000);
+              until = Infinity;
+            } else if (range === 'all') {
+              since = 0;
+              until = Infinity;
+            }
+          }
+
+          const filteredEvents = allEvents.filter(e => {
+            const ts = e.ts || 0;
+            return ts >= since && ts <= until;
+          });
+
+          const filteredClicks = allClicks.filter(c => {
+            const ts = c.timestamp || 0;
+            return ts >= since && ts <= until;
+          });
 
           const visits = filteredEvents.filter(e => e.t === 'visit');
           const views = filteredEvents.filter(e => e.t === 'view');
@@ -554,7 +591,10 @@ module.exports = async (req, res) => {
             desktop_visits: desktopVisits,
             total_clicks: clicks.length,
             total_tool_views: views.length,
-            tool_clicks: sortedClicks
+            tool_clicks: sortedClicks,
+            range: range,
+            since: since,
+            until: until === Infinity ? null : until
           });
         }
       }

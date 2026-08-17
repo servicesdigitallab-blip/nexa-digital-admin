@@ -8,7 +8,13 @@
     user: JSON.parse(localStorage.getItem('nexa_admin_user') || 'null'),
     activeTab: 'dashboard',
     draggedToolId: null, // dashboard, tools, coupons, freebies, reviews
-    timeRange: 'today', // today, week, all
+    timeRange: 'today', // today, yesterday, this_week, last_week, month, all, custom
+    timeRangeLabel: 'Today',
+    showCustomDatePicker: false,
+    customFilter: { day: 'all', month: (new Date().getMonth() + 1), year: new Date().getFullYear() },
+    customSince: null,
+    customUntil: null,
+    customLabel: '',
     analytics: {
       live_visitors: 0,
       total_visits: 0,
@@ -157,7 +163,14 @@
     if (Date.now() - _lastUserAction < 3000) return;
     try {
       if (state.activeTab === 'dashboard') {
-        const analytics = await apiFetch(`/analytics?range=${state.timeRange}`);
+        let url = `/analytics?range=${state.timeRange}`;
+        if (state.timeRange === 'custom' && state.customSince !== null && state.customSince !== undefined) {
+          url += `&since=${state.customSince}`;
+          if (state.customUntil !== null && state.customUntil !== undefined && state.customUntil !== Infinity) {
+            url += `&until=${state.customUntil}`;
+          }
+        }
+        const analytics = await apiFetch(url);
         if (analytics && Date.now() - _lastUserAction > 3000) {
           state.analytics = analytics;
           render();
@@ -370,18 +383,83 @@
     return `
       <div class="space-y-6">
         <!-- Top Filters & Header -->
-        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div class="flex flex-col xl:flex-row xl:items-center justify-between gap-4">
           <div>
             <h2 class="text-2xl font-bold font-syne text-zinc-100">Live Traffic & Analytics</h2>
             <p class="text-sm text-zinc-400">Real-time visitor counts, device breakdown, and tool WhatsApp conversions</p>
           </div>
 
-          <div class="inline-flex bg-zinc-900 border border-zinc-800 rounded-xl p-1">
-            <button onclick="window.setTimeRange('today')" class="px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-colors ${state.timeRange === 'today' ? 'bg-amber-500 text-zinc-950 shadow-sm' : 'text-zinc-400 hover:text-zinc-200'}">Today</button>
-            <button onclick="window.setTimeRange('week')" class="px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-colors ${state.timeRange === 'week' ? 'bg-amber-500 text-zinc-950 shadow-sm' : 'text-zinc-400 hover:text-zinc-200'}">This Week</button>
-            <button onclick="window.setTimeRange('all')" class="px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-colors ${state.timeRange === 'all' ? 'bg-amber-500 text-zinc-950 shadow-sm' : 'text-zinc-400 hover:text-zinc-200'}">Lifetime</button>
+          <!-- Time Range Filter Pills -->
+          <div class="flex flex-wrap items-center gap-1.5 bg-zinc-900/90 border border-zinc-800 p-1.5 rounded-2xl shadow-inner">
+            <button type="button" onclick="window.setTimeRange('today')" class="px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${state.timeRange === 'today' ? 'bg-amber-500 text-zinc-950 shadow-md shadow-amber-500/20 font-bold' : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60'}">Today</button>
+            <button type="button" onclick="window.setTimeRange('yesterday')" class="px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${state.timeRange === 'yesterday' ? 'bg-amber-500 text-zinc-950 shadow-md shadow-amber-500/20 font-bold' : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60'}">Yesterday</button>
+            <button type="button" onclick="window.setTimeRange('this_week')" class="px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${state.timeRange === 'this_week' || state.timeRange === 'week' ? 'bg-amber-500 text-zinc-950 shadow-md shadow-amber-500/20 font-bold' : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60'}">This Week</button>
+            <button type="button" onclick="window.setTimeRange('last_week')" class="px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${state.timeRange === 'last_week' ? 'bg-amber-500 text-zinc-950 shadow-md shadow-amber-500/20 font-bold' : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60'}">Last Week</button>
+            <button type="button" onclick="window.setTimeRange('month')" class="px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${state.timeRange === 'month' || state.timeRange === 'last_30_days' ? 'bg-amber-500 text-zinc-950 shadow-md shadow-amber-500/20 font-bold' : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60'}">Last 1 Month</button>
+            <button type="button" onclick="window.setTimeRange('all')" class="px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${state.timeRange === 'all' ? 'bg-amber-500 text-zinc-950 shadow-md shadow-amber-500/20 font-bold' : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60'}">Lifetime</button>
+            <button type="button" onclick="window.toggleCustomDatePicker()" class="px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${state.timeRange === 'custom' || state.showCustomDatePicker ? 'bg-amber-500 text-zinc-950 shadow-md shadow-amber-500/20 font-bold' : 'text-amber-400 hover:text-amber-300 hover:bg-amber-500/10 border border-amber-500/30'}">
+              <svg class="w-3.5 h-3.5 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+              <span class="pointer-events-none">Custom Date</span>
+            </button>
           </div>
         </div>
+
+        <!-- Custom Date Picker Dropdown Panel -->
+        ${state.showCustomDatePicker ? `
+          <div class="glass-card rounded-2xl p-4 border border-amber-500/30 bg-zinc-900/90 shadow-xl space-y-3 animate-fadeIn">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-2 text-xs font-bold text-amber-400">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                <span>Filter by Specific Day, Month, & Year</span>
+              </div>
+              <button type="button" onclick="window.toggleCustomDatePicker()" class="text-zinc-400 hover:text-zinc-200 text-xs px-2 py-1 rounded-lg hover:bg-zinc-800 transition-colors cursor-pointer">✕ Close</button>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-4 gap-3">
+              <!-- Day Selector -->
+              <div>
+                <label class="block text-[11px] font-medium text-zinc-400 mb-1">Day / Date</label>
+                <select id="customFilterDay" class="w-full bg-zinc-950 border border-zinc-700/80 rounded-xl px-3 py-2 text-xs text-zinc-100 focus:outline-none focus:border-amber-500">
+                  <option value="all" ${(state.customFilter?.day === 'all' || !state.customFilter?.day) ? 'selected' : ''}>Full Month (All Days)</option>
+                  ${Array.from({length: 31}, (_, i) => i + 1).map(d => `<option value="${d}" ${state.customFilter?.day == d ? 'selected' : ''}>Day ${d}</option>`).join('')}
+                </select>
+              </div>
+
+              <!-- Month Selector -->
+              <div>
+                <label class="block text-[11px] font-medium text-zinc-400 mb-1">Month</label>
+                <select id="customFilterMonth" class="w-full bg-zinc-950 border border-zinc-700/80 rounded-xl px-3 py-2 text-xs text-zinc-100 focus:outline-none focus:border-amber-500">
+                  ${['January (01)', 'February (02)', 'March (03)', 'April (04)', 'May (05)', 'June (06)', 'July (07)', 'August (08)', 'September (09)', 'October (10)', 'November (11)', 'December (12)'].map((m, idx) => {
+                    const mNum = idx + 1;
+                    const currMonth = (new Date().getMonth() + 1);
+                    const sel = (state.customFilter?.month ? state.customFilter.month == mNum : currMonth == mNum);
+                    return `<option value="${mNum}" ${sel ? 'selected' : ''}>${m}</option>`;
+                  }).join('')}
+                </select>
+              </div>
+
+              <!-- Year Selector (Current year e.g. 2026) -->
+              <div>
+                <label class="block text-[11px] font-medium text-zinc-400 mb-1">Year</label>
+                <select id="customFilterYear" class="w-full bg-zinc-950 border border-zinc-700/80 rounded-xl px-3 py-2 text-xs text-zinc-100 focus:outline-none focus:border-amber-500">
+                  ${(() => {
+                    const currentYear = new Date().getFullYear();
+                    const years = [currentYear, currentYear - 1, currentYear - 2, currentYear - 3];
+                    return years.map(y => `<option value="${y}" ${(state.customFilter?.year ? state.customFilter.year == y : y === currentYear) ? 'selected' : ''}>${y}</option>`).join('');
+                  })()}
+                </select>
+              </div>
+
+              <!-- Apply Button -->
+              <div class="flex items-end">
+                <button type="button" onclick="window.applyCustomDateFilter()" class="w-full py-2 px-4 rounded-xl bg-amber-500 hover:bg-amber-400 text-zinc-950 font-bold text-xs shadow-lg shadow-amber-500/20 transition-all flex items-center justify-center gap-1.5 cursor-pointer">
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                  <span>Apply Filter</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        ` : ''}
 
         <!-- 4 Key Stat Metric Cards -->
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
@@ -400,7 +478,7 @@
               <span class="p-2 rounded-xl bg-amber-500/10 text-amber-400">${icons.dashboard}</span>
             </div>
             <div class="text-3xl font-extrabold font-syne text-zinc-100">${a.total_visits.toLocaleString()}</div>
-            <div class="text-xs text-zinc-400 mt-1">Filtered by ${state.timeRange}</div>
+            <div class="text-xs text-zinc-400 mt-1">Filtered by: <span class="text-amber-400 font-semibold">${state.timeRangeLabel || (state.timeRange === 'today' ? 'Today' : state.timeRange === 'yesterday' ? 'Yesterday' : state.timeRange === 'this_week' || state.timeRange === 'week' ? 'This Week' : state.timeRange === 'last_week' ? 'Last Week' : state.timeRange === 'month' ? 'Last 1 Month' : state.timeRange === 'all' ? 'Lifetime' : state.customLabel || 'Custom')}</span></div>
           </div>
 
           <div class="glass-card rounded-3xl p-6 relative overflow-hidden border-blue-500/20">
@@ -1562,7 +1640,14 @@
         }
       }).catch(function(){});
     } else if (tab === 'dashboard') {
-      apiFetch('/analytics?range=' + state.timeRange).then(function(res) {
+      let url = '/analytics?range=' + state.timeRange;
+      if (state.timeRange === 'custom' && state.customSince !== null && state.customSince !== undefined) {
+        url += '&since=' + state.customSince;
+        if (state.customUntil !== null && state.customUntil !== undefined && state.customUntil !== Infinity) {
+          url += '&until=' + state.customUntil;
+        }
+      }
+      apiFetch(url).then(function(res) {
         if (res) {
           state.analytics = res;
           render();
@@ -1571,12 +1656,120 @@
     }
   };
 
-  window.setTimeRange = async function (range) {
+  window.setTimeRange = async function (range, customSince, customUntil, customLabel) {
     _lastUserAction = Date.now();
     state.timeRange = range;
-    const a = await apiFetch(`/analytics?range=${range}`);
+    if (range !== 'custom') {
+      state.showCustomDatePicker = false;
+    }
+
+    let label = 'Today';
+    let since = null;
+    let until = null;
+
+    if (range === 'today') {
+      label = 'Today';
+      const d = new Date();
+      d.setHours(0, 0, 0, 0);
+      since = d.getTime();
+      until = Infinity;
+    } else if (range === 'yesterday') {
+      label = 'Yesterday';
+      const d = new Date();
+      d.setHours(0, 0, 0, 0);
+      until = d.getTime();
+      d.setDate(d.getDate() - 1);
+      since = d.getTime();
+    } else if (range === 'this_week' || range === 'week') {
+      label = 'This Week';
+      const d = new Date();
+      const day = d.getDay() || 7;
+      d.setHours(0, 0, 0, 0);
+      d.setDate(d.getDate() - (day - 1));
+      since = d.getTime();
+      until = Infinity;
+    } else if (range === 'last_week') {
+      label = 'Last Week';
+      const d = new Date();
+      const day = d.getDay() || 7;
+      d.setHours(0, 0, 0, 0);
+      d.setDate(d.getDate() - (day - 1));
+      until = d.getTime();
+      d.setDate(d.getDate() - 7);
+      since = d.getTime();
+    } else if (range === 'month' || range === 'last_30_days') {
+      label = 'Last 1 Month';
+      since = Date.now() - (30 * 24 * 60 * 60 * 1000);
+      until = Infinity;
+    } else if (range === 'all') {
+      label = 'Lifetime';
+      since = 0;
+      until = Infinity;
+    } else if (range === 'custom') {
+      label = customLabel || state.customLabel || 'Custom Date';
+      since = (customSince !== undefined && customSince !== null) ? customSince : state.customSince;
+      until = (customUntil !== undefined && customUntil !== null) ? customUntil : state.customUntil;
+    }
+
+    state.timeRangeLabel = label;
+    state.customSince = since;
+    state.customUntil = until;
+
+    let url = `/analytics?range=${range}`;
+    if (since !== null && since !== undefined) {
+      url += `&since=${since}`;
+    }
+    if (until !== null && until !== undefined && until !== Infinity) {
+      url += `&until=${until}`;
+    }
+
+    const a = await apiFetch(url);
     if (a) state.analytics = a;
     render();
+  };
+
+  window.toggleCustomDatePicker = function () {
+    _lastUserAction = Date.now();
+    state.showCustomDatePicker = !state.showCustomDatePicker;
+    render();
+  };
+
+  window.applyCustomDateFilter = function () {
+    _lastUserAction = Date.now();
+    const dayEl = document.getElementById('customFilterDay');
+    const monthEl = document.getElementById('customFilterMonth');
+    const yearEl = document.getElementById('customFilterYear');
+
+    const dayVal = dayEl ? dayEl.value : 'all';
+    const monthVal = monthEl ? parseInt(monthEl.value, 10) : (new Date().getMonth() + 1);
+    const yearVal = yearEl ? parseInt(yearEl.value, 10) : new Date().getFullYear();
+
+    state.customFilter = { day: dayVal, month: monthVal, year: yearVal };
+
+    const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    let since, until, label;
+
+    if (dayVal === 'all') {
+      const start = new Date(yearVal, monthVal - 1, 1, 0, 0, 0, 0);
+      const end = new Date(yearVal, monthVal, 0, 23, 59, 59, 999);
+      since = start.getTime();
+      until = end.getTime();
+      label = `${monthNames[monthVal - 1]} ${yearVal} (Full Month)`;
+    } else {
+      const dayNum = parseInt(dayVal, 10);
+      const start = new Date(yearVal, monthVal - 1, dayNum, 0, 0, 0, 0);
+      const end = new Date(yearVal, monthVal - 1, dayNum, 23, 59, 59, 999);
+      since = start.getTime();
+      until = end.getTime();
+      label = `${dayNum} ${monthNames[monthVal - 1]} ${yearVal}`;
+    }
+
+    state.customSince = since;
+    state.customUntil = until;
+    state.customLabel = label;
+    state.showCustomDatePicker = false;
+
+    window.setTimeRange('custom', since, until, label);
   };
 
   window.logoutAdmin = logout;
