@@ -490,24 +490,53 @@ module.exports = async (req, res) => {
 
   // 7. Live Cloud-Persistent Analytics Dashboard
   if (urlPath.startsWith('/analytics')) {
+    const query = new URL('http://x' + req.url).searchParams;
+    const range = query.get('range') || 'all';
+
     try {
       const setRes = await fetch(`${supabaseUrl}/rest/v1/site_settings?id=eq.${SETTINGS_ID}&select=about`, { headers: sbHeaders });
       if (setRes.ok) {
         const rows = await setRes.json();
         if (rows[0] && rows[0].about && rows[0].about.analytics) {
           const stats = rows[0].about.analytics;
-          
-          // Aggregate individual clicks into grouped format for UI
-          const rawClicks = stats.tool_clicks || [];
+          const allEvents = Array.isArray(stats.events) ? stats.events : [];
+          const allClicks = Array.isArray(stats.tool_clicks) ? stats.tool_clicks : [];
+
+          // Calculate time boundary
+          const now = Date.now();
+          let since = 0;
+          if (range === 'today') {
+            const d = new Date();
+            d.setHours(0, 0, 0, 0);
+            since = d.getTime();
+          } else if (range === 'week') {
+            const d = new Date();
+            d.setDate(d.getDate() - d.getDay());
+            d.setHours(0, 0, 0, 0);
+            since = d.getTime();
+          }
+          // range === 'all' means since = 0, include everything
+
+          const filteredEvents = since > 0 ? allEvents.filter(e => (e.ts || 0) >= since) : allEvents;
+          const filteredClicks = since > 0 ? allClicks.filter(c => (c.timestamp || 0) >= since) : allClicks;
+
+          const visits = filteredEvents.filter(e => e.t === 'visit');
+          const views = filteredEvents.filter(e => e.t === 'view');
+          const clicks = filteredEvents.filter(e => e.t === 'click');
+
+          const mobileVisits = visits.filter(e => e.d === 'mobile').length;
+          const desktopVisits = visits.length - mobileVisits;
+
+          // Aggregate clicks into grouped format
           const aggClicks = {};
-          rawClicks.forEach(c => {
+          filteredClicks.forEach(c => {
             const tId = c.toolId || 'unknown';
             if (!aggClicks[tId]) {
               aggClicks[tId] = {
                 id: tId,
                 name: c.toolName || tId,
                 category: 'Tool',
-                views: 1, // We don't have individual views by tool, so just placeholder
+                views: 0,
                 clicks: 0,
                 plan_breakdown: {}
               };
@@ -516,15 +545,15 @@ module.exports = async (req, res) => {
             const p = c.planName || 'Standard';
             aggClicks[tId].plan_breakdown[p] = (aggClicks[tId].plan_breakdown[p] || 0) + 1;
           });
-          const sortedClicks = Object.values(aggClicks).sort((a,b) => b.clicks - a.clicks);
+          const sortedClicks = Object.values(aggClicks).sort((a, b) => b.clicks - a.clicks);
 
           return res.status(200).json({
             live_visitors: 1,
-            total_visits: stats.total_visits || 1,
-            mobile_visits: stats.mobile_visits || 0,
-            desktop_visits: stats.desktop_visits || 1,
-            total_clicks: stats.total_clicks || 0,
-            total_tool_views: stats.total_tool_views || 0,
+            total_visits: visits.length,
+            mobile_visits: mobileVisits,
+            desktop_visits: desktopVisits,
+            total_clicks: clicks.length,
+            total_tool_views: views.length,
             tool_clicks: sortedClicks
           });
         }
@@ -533,9 +562,9 @@ module.exports = async (req, res) => {
 
     return res.status(200).json({
       live_visitors: 1,
-      total_visits: 1,
+      total_visits: 0,
       mobile_visits: 0,
-      desktop_visits: 1,
+      desktop_visits: 0,
       total_clicks: 0,
       total_tool_views: 0,
       tool_clicks: []

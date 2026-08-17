@@ -146,23 +146,26 @@
   }
 
   // --- Real-time Polling for Live Visitors ---
+  let _lastUserAction = 0;
   setInterval(async () => {
-    if (state.token) {
+    if (!state.token) return;
+    if (Date.now() - _lastUserAction < 3000) return;
+    try {
       if (state.activeTab === 'dashboard') {
         const analytics = await apiFetch(`/analytics?range=${state.timeRange}`);
-        if (analytics) {
+        if (analytics && Date.now() - _lastUserAction > 3000) {
           state.analytics = analytics;
           render();
         }
       } else if (state.activeTab === 'inquiries') {
         const inq = await apiFetch('/contact-inquiries');
-        if (inq && inq.inquiries) {
+        if (inq && inq.inquiries && Date.now() - _lastUserAction > 3000) {
           state.inquiries = inq.inquiries;
           render();
         }
       }
-    }
-  }, 4000);
+    } catch(e) {}
+  }, 8000);
 
   // --- SVG Icons Helper ---
   const icons = {
@@ -1536,27 +1539,29 @@
   // --- Global Window Handler Attachments ---
   window.switchTab = function (tab) {
     if (!tab) return;
+    _lastUserAction = Date.now();
     state.activeTab = tab;
     state.searchQuery = '';
     render();
     if (tab === 'inquiries') {
-      apiFetch('/contact-inquiries').then(res => {
+      apiFetch('/contact-inquiries').then(function(res) {
         if (res && res.inquiries) {
           state.inquiries = res.inquiries;
           render();
         }
-      }).catch(() => {});
+      }).catch(function(){});
     } else if (tab === 'dashboard') {
-      apiFetch('/analytics?range=' + state.timeRange).then(res => {
+      apiFetch('/analytics?range=' + state.timeRange).then(function(res) {
         if (res) {
           state.analytics = res;
           render();
         }
-      }).catch(() => {});
+      }).catch(function(){});
     }
   };
 
   window.setTimeRange = async function (range) {
+    _lastUserAction = Date.now();
     state.timeRange = range;
     const a = await apiFetch(`/analytics?range=${range}`);
     if (a) state.analytics = a;
@@ -2514,6 +2519,7 @@ ${escapeHtml(item.message || '(No message content)')}
   };
 
   window.viewInquiry = async function (id) {
+    _lastUserAction = Date.now();
     const item = (state.inquiries || []).find(i => i.id === id);
     if (item) {
       state.viewingInquiry = item;
@@ -2528,6 +2534,7 @@ ${escapeHtml(item.message || '(No message content)')}
   };
 
   window.closeInquiryModal = function () {
+    _lastUserAction = Date.now();
     state.viewingInquiry = null;
     render();
   };
@@ -2545,6 +2552,7 @@ ${escapeHtml(item.message || '(No message content)')}
   };
 
   window.deleteInquiry = async function (id) {
+    _lastUserAction = Date.now();
     if (!confirm('Are you sure you want to delete this inquiry?')) return;
     state.inquiries = (state.inquiries || []).filter(i => i.id !== id);
     if (state.viewingInquiry && state.viewingInquiry.id === id) {
