@@ -279,16 +279,16 @@
           ${tabs.map(t => {
             const active = state.activeTab === t.id;
             return `
-              <button onclick="window.switchTab('${t.id}')" class="w-full flex items-center justify-between px-3.5 py-3 rounded-xl text-sm font-medium transition-all ${
+              <button type="button" data-tab="${t.id}" onclick="window.switchTab('${t.id}')" class="tab-btn w-full flex items-center justify-between px-3.5 py-3 rounded-xl text-sm font-medium transition-all cursor-pointer ${
                 active 
                   ? 'bg-amber-500/10 text-amber-400 border border-amber-500/30 shadow-sm shadow-amber-500/10' 
                   : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900 border border-transparent'
               }">
-                <div class="flex items-center gap-3">
+                <div class="flex items-center gap-3 pointer-events-none">
                   ${t.icon}
                   <span>${t.label}</span>
                 </div>
-                ${t.badge !== undefined ? `<span class="px-2 py-0.5 text-[11px] rounded-full font-semibold ${active ? 'bg-amber-400/20 text-amber-300' : 'bg-zinc-800 text-zinc-400'}">${t.badge}</span>` : ''}
+                ${t.badge !== undefined ? `<span class="pointer-events-none px-2 py-0.5 text-[11px] rounded-full font-semibold ${active ? 'bg-amber-400/20 text-amber-300' : 'bg-zinc-800 text-zinc-400'}">${t.badge}</span>` : ''}
               </button>
             `;
           }).join('')}
@@ -1534,26 +1534,25 @@
   }
 
   // --- Global Window Handler Attachments ---
-  window.switchTab = async function (tab) {
+  window.switchTab = function (tab) {
+    if (!tab) return;
     state.activeTab = tab;
     state.searchQuery = '';
     render();
     if (tab === 'inquiries') {
-      try {
-        const res = await apiFetch('/contact-inquiries');
+      apiFetch('/contact-inquiries').then(res => {
         if (res && res.inquiries) {
           state.inquiries = res.inquiries;
           render();
         }
-      } catch(e) {}
+      }).catch(() => {});
     } else if (tab === 'dashboard') {
-      try {
-        const res = await apiFetch('/analytics?range=' + state.timeRange);
+      apiFetch('/analytics?range=' + state.timeRange).then(res => {
         if (res) {
           state.analytics = res;
           render();
         }
-      } catch(e) {}
+      }).catch(() => {});
     }
   };
 
@@ -1939,7 +1938,7 @@
                 </thead>
                 <tbody class="divide-y divide-zinc-800/60">
                   ${filtered.map(item => `
-                    <tr class="hover:bg-zinc-900/40 transition-colors ${item.status === 'new' ? 'bg-amber-500/[0.03]' : ''}">
+                    <tr onclick="window.viewInquiry('${item.id}')" class="hover:bg-zinc-900/60 cursor-pointer transition-colors ${item.status === 'new' ? 'bg-amber-500/[0.05]' : ''}">
                       <td class="py-4 px-6">
                         <div class="font-bold text-zinc-100 text-sm">${escapeHtml(item.name || 'Anonymous')}</div>
                         <a href="mailto:${escapeHtml(item.email)}" class="text-zinc-400 hover:text-amber-400 transition-colors text-[11px] block mt-0.5">${escapeHtml(item.email)}</a>
@@ -2604,7 +2603,14 @@ ${escapeHtml(item.message || '(No message content)')}
   }
 
   function bindAppEvents() {
-    // any DOM specific listener if needed
+    document.querySelectorAll('[data-tab]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const tab = btn.getAttribute('data-tab');
+        if (tab && window.switchTab) {
+          window.switchTab(tab);
+        }
+      });
+    });
   }
 
   // --- Init ---
