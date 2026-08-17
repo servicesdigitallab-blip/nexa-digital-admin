@@ -41,6 +41,11 @@
 
   window.state = state;
 
+  function escapeHtml(str) {
+    if (!str) return '';
+    return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+  }
+
   
   function broadcastSync() {
     try {
@@ -188,33 +193,39 @@
     const root = document.getElementById('app');
     if (!root) return;
 
-    if (!state.token) {
-      root.innerHTML = renderLogin();
-      bindLoginEvents();
-      return;
-    }
+    try {
+      if (!state.token) {
+        root.innerHTML = renderLogin();
+        bindLoginEvents();
+        return;
+      }
 
-    root.innerHTML = `
-      <div class="flex h-screen overflow-hidden bg-[#09090b]">
-        ${renderSidebar()}
-        <div class="flex-1 flex flex-col min-w-0 overflow-hidden">
-          ${renderTopbar()}
-          <main class="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 custom-scrollbar">
-            ${renderActiveTab()}
-          </main>
+      root.innerHTML = `
+        <div class="flex h-screen overflow-hidden bg-[#09090b]">
+          ${renderSidebar()}
+          <div class="flex-1 flex flex-col min-w-0 overflow-hidden">
+            ${renderTopbar()}
+            <main class="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 custom-scrollbar">
+              ${renderActiveTab()}
+            </main>
+          </div>
         </div>
-      </div>
-      ${state.toast ? renderToast() : ''}
-      ${state.editingTool ? renderToolModal() : ''}
-      ${state.editingCoupon ? renderCouponModal() : ''}
-      ${state.editingFreebie ? renderFreebieModal() : ''}
-      ${state.editingReview ? renderReviewModal() : ''}
-      ${state.editingPick ? renderPickModal() : ''}
-      ${state.viewingInquiry ? renderInquiryModal() : ''}
-    `;
+        ${state.toast ? renderToast() : ''}
+        ${state.editingTool ? renderToolModal() : ''}
+        ${state.editingCoupon ? renderCouponModal() : ''}
+        ${state.editingFreebie ? renderFreebieModal() : ''}
+        ${state.editingReview ? renderReviewModal() : ''}
+        ${state.editingPick ? renderPickModal() : ''}
+        ${state.viewingInquiry ? renderInquiryModal() : ''}
+      `;
 
-    bindAppEvents();
+      bindAppEvents();
+    } catch(err) {
+      console.error('Render error:', err);
+    }
   }
+  window.render = render;
+  window.loadAllData = loadAllData;
 
   // --- Views ---
   function renderLogin() {
@@ -257,12 +268,12 @@
   function renderSidebar() {
     const tabs = [
       { id: 'dashboard', label: 'Dashboard', icon: icons.dashboard },
-      { id: 'tools', label: 'Tools & Catalog', icon: icons.tools, badge: state.tools.length },
+      { id: 'tools', label: 'Tools & Catalog', icon: icons.tools, badge: (state.tools || []).length },
       { id: 'picks', label: 'Popular Picks (Hero)', icon: icons.picks, badge: (state.popularPicks || []).filter(p => p.enabled !== false).length },
-      { id: 'coupons', label: 'Coupons Engine', icon: icons.coupons, badge: state.coupons.filter(c => c.is_active).length },
+      { id: 'coupons', label: 'Coupons Engine', icon: icons.coupons, badge: (state.coupons || []).filter(c => c.is_active).length },
       { id: 'inquiries', label: 'Contact Inquiries', icon: icons.messages, badge: (state.inquiries || []).filter(i => i.status === 'new').length },
-      { id: 'freebies', label: 'Editing Packs', icon: icons.freebies, badge: state.freebies.length },
-      { id: 'reviews', label: 'Customer Reviews', icon: icons.reviews, badge: state.reviews.length }
+      { id: 'freebies', label: 'Editing Packs', icon: icons.freebies, badge: (state.freebies || []).length },
+      { id: 'reviews', label: 'Customer Reviews', icon: icons.reviews, badge: (state.reviews || []).length }
     ];
 
     return `
@@ -282,7 +293,7 @@
           ${tabs.map(t => {
             const active = state.activeTab === t.id;
             return `
-              <button type="button" data-tab="${t.id}" onclick="window.switchTab('${t.id}')" class="tab-btn w-full flex items-center justify-between px-3.5 py-3 rounded-xl text-sm font-medium transition-all cursor-pointer ${
+              <button type="button" data-tab="${t.id}" class="tab-btn w-full flex items-center justify-between px-3.5 py-3 rounded-xl text-sm font-medium transition-all cursor-pointer ${
                 active 
                   ? 'bg-amber-500/10 text-amber-400 border border-amber-500/30 shadow-sm shadow-amber-500/10' 
                   : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900 border border-transparent'
@@ -2611,14 +2622,7 @@ ${escapeHtml(item.message || '(No message content)')}
   }
 
   function bindAppEvents() {
-    document.querySelectorAll('[data-tab]').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        const tab = btn.getAttribute('data-tab');
-        if (tab && window.switchTab) {
-          window.switchTab(tab);
-        }
-      });
-    });
+    // intentionally empty — tab clicks handled by document-level delegation below
   }
 
   // --- Init ---
@@ -2627,3 +2631,18 @@ ${escapeHtml(item.message || '(No message content)')}
   }
   render();
 })();
+
+// === GLOBAL CLICK DELEGATION (runs once, immune to innerHTML rebuilds) ===
+document.addEventListener('click', function(e) {
+  // Tab switching
+  var tabBtn = e.target.closest('[data-tab]');
+  if (tabBtn) {
+    var tab = tabBtn.getAttribute('data-tab');
+    if (tab && window.switchTab) {
+      e.preventDefault();
+      e.stopPropagation();
+      window.switchTab(tab);
+      return;
+    }
+  }
+}, true); // useCapture=true to fire before any other handlers
