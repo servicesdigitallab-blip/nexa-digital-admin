@@ -352,7 +352,7 @@
         </div>
 
         <div class="flex items-center gap-3">
-          <a href="https://nexa-digital-storefront.vercel.app/" target="_blank" class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-zinc-100 text-xs font-medium border border-zinc-700/80 transition-colors">
+          <a href="https://nexadigitaltools.com/" target="_blank" class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-zinc-100 text-xs font-medium border border-zinc-700/80 transition-colors">
             <span>View Live Website</span>
             ${icons.external}
           </a>
