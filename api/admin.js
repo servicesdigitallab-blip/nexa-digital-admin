@@ -128,6 +128,23 @@ module.exports = async (req, res) => {
         };
       });
 
+      // Sort tools deterministically by tools_order or sort_order
+      try {
+        const setRes = await fetch(`${supabaseUrl}/rest/v1/site_settings?id=eq.${SETTINGS_ID}&select=hero`, { headers: sbHeaders });
+        if (setRes.ok) {
+          const rows = await setRes.json();
+          if (rows[0] && rows[0].hero && Array.isArray(rows[0].hero.tools_order) && rows[0].hero.tools_order.length > 0) {
+            const orderMap = {};
+            rows[0].hero.tools_order.forEach((id, idx) => { orderMap[id] = idx; });
+            fullTools.sort((a, b) => {
+              const ordA = orderMap[a.id] !== undefined ? orderMap[a.id] : (a.sort_order !== null && a.sort_order !== undefined ? a.sort_order : 9999);
+              const ordB = orderMap[b.id] !== undefined ? orderMap[b.id] : (b.sort_order !== null && b.sort_order !== undefined ? b.sort_order : 9999);
+              return ordA - ordB;
+            });
+          }
+        }
+      } catch(e) {}
+
       return res.status(200).json({ tools: fullTools, categories });
     } catch (e) {
       return res.status(200).json({ tools: store.products || [], categories: store.categories || [] });
@@ -203,6 +220,49 @@ module.exports = async (req, res) => {
     }
 
     return res.status(200).json({ success: true, tool: { ...update, id: newId } });
+  }
+
+  // 4a. Reorder Tools (PUT /tools/reorder)
+  if (urlPath === '/tools/reorder' && method === 'PUT') {
+    try {
+      let body = req.body || {};
+      if (typeof body === 'string') {
+        try { body = JSON.parse(body); } catch(e) {}
+      }
+      const ids = Array.isArray(body.ids) ? body.ids : (Array.isArray(body) ? body : []);
+      if (ids.length > 0) {
+        // 1. Batch update sort_order in Supabase products table
+        const updatePromises = ids.map((id, idx) => {
+          if (!isUUID(id)) return null;
+          return fetch(`${supabaseUrl}/rest/v1/products?id=eq.${id}`, {
+            method: 'PATCH',
+            headers: sbHeaders,
+            body: JSON.stringify({ sort_order: idx })
+          });
+        }).filter(Boolean);
+        await Promise.all(updatePromises);
+
+        // 2. Also persist tools_order in site_settings.hero for 100% guarantee
+        try {
+          const setRes = await fetch(`${supabaseUrl}/rest/v1/site_settings?id=eq.${SETTINGS_ID}&select=hero`, { headers: sbHeaders });
+          if (setRes.ok) {
+            const rows = await setRes.json();
+            const hero = (rows[0] && rows[0].hero) ? rows[0].hero : {};
+            hero.tools_order = ids;
+            await fetch(`${supabaseUrl}/rest/v1/site_settings?id=eq.${SETTINGS_ID}`, {
+              method: 'PATCH',
+              headers: sbHeaders,
+              body: JSON.stringify({ hero })
+            });
+          }
+        } catch(e) {}
+      }
+
+      return res.status(200).json({ success: true, count: ids.length });
+    } catch (e) {
+      console.error('PUT /tools/reorder error:', e);
+      return res.status(500).json({ success: false, message: e.message });
+    }
   }
 
   // 4. Update Tool (PUT /tools/:id with UUID Resolver)

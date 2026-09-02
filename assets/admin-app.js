@@ -2019,6 +2019,7 @@
 
   window.handleToolDrop = async (e, targetToolId) => {
     e.preventDefault();
+    _lastUserAction = Date.now();
     document.querySelectorAll('tr').forEach(r => {
       r.classList.remove('opacity-40', 'bg-amber-500/10', 'border-t-2', 'border-amber-400');
     });
@@ -2041,13 +2042,14 @@
     const ids = state.tools.map(t => t.id);
     const res = await apiFetch('/tools/reorder', { method: 'PUT', body: JSON.stringify({ ids }) });
     if (res && res.success) {
-      showToast(`Moved "${moved.name}" to position #${toIdx + 1} live!`);
+      showToast(`Moved "${moved.name}" to position #${toIdx + 1} live!`, 'success');
       broadcastSync();
     }
   };
 
   
   window.changeToolPositionInput = async (toolId, newPosStr) => {
+    _lastUserAction = Date.now();
     const newPos = parseInt(newPosStr, 10);
     if (isNaN(newPos) || newPos < 1 || newPos > state.tools.length) return;
     const targetIdx = newPos - 1;
@@ -2062,12 +2064,13 @@
     const ids = state.tools.map(t => t.id);
     const res = await apiFetch('/tools/reorder', { method: 'PUT', body: JSON.stringify({ ids }) });
     if (res && res.success) {
-      showToast(`Moved "${moved.name}" to position #${newPos}!`);
+      showToast(`Moved "${moved.name}" to position #${newPos}!`, 'success');
       broadcastSync();
     }
   };
 
   window.moveToolSequence = async function (id, direction) {
+    _lastUserAction = Date.now();
     const index = state.tools.findIndex(t => t.id === id);
     if (index === -1) return;
     if (direction === 'up' && index > 0) {
@@ -2079,13 +2082,18 @@
       state.tools[index] = state.tools[index + 1];
       state.tools[index + 1] = temp;
     }
+    state.tools.forEach((t, i) => { t.sort_order = i; });
     render();
 
     const reorderedIds = state.tools.map(t => t.id);
-    await apiFetch('/tools/reorder', {
+    const res = await apiFetch('/tools/reorder', {
       method: 'PUT',
       body: JSON.stringify({ ids: reorderedIds })
     });
+    if (res && res.success) {
+      showToast(`Sequence saved live!`, 'success');
+      broadcastSync();
+    }
   };
 
   
