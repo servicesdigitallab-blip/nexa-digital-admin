@@ -804,7 +804,12 @@ module.exports = async (req, res) => {
       const fbRes = await fetch(`${supabaseUrl}/rest/v1/freebies?select=*&order=sort_order.asc`, { headers: sbHeaders });
       if (fbRes.ok) {
         const data = await fbRes.json();
-        return res.status(200).json({ freebies: data });
+        const mapped = (data || []).map(f => ({
+          ...f,
+          download_url: f.download_url || f.download_link || '',
+          download_link: f.download_url || f.download_link || ''
+        }));
+        return res.status(200).json({ freebies: mapped });
       }
     } catch(e) {}
     return res.status(200).json({ freebies: store.freebies || [] });
@@ -817,13 +822,14 @@ module.exports = async (req, res) => {
         try { body = JSON.parse(body); } catch(e) {}
       }
       const newId = isUUID(body.id) ? body.id : crypto.randomUUID();
+      const link = body.download_url || body.download_link || body.link || '';
       const payload = {
         id: newId,
         name: body.name,
         category: body.category || 'Editing Packs',
         description: body.description || '',
         image: body.image || '',
-        download_url: body.download_url || '',
+        download_url: link,
         features: Array.isArray(body.features) ? body.features : null,
         sort_order: Number(body.sort_order || 0)
       };
@@ -866,7 +872,9 @@ module.exports = async (req, res) => {
       if (body.category !== undefined) payload.category = body.category;
       if (body.description !== undefined) payload.description = body.description;
       if (body.image !== undefined) payload.image = body.image;
-      if (body.download_url !== undefined) payload.download_url = body.download_url;
+      if (body.download_url !== undefined || body.download_link !== undefined || body.link !== undefined) {
+        payload.download_url = body.download_url !== undefined ? body.download_url : (body.download_link !== undefined ? body.download_link : body.link);
+      }
       if (body.features !== undefined) payload.features = Array.isArray(body.features) ? body.features : null;
       if (body.sort_order !== undefined) payload.sort_order = Number(body.sort_order);
       

@@ -1013,10 +1013,7 @@
               </div>
 
               <div class="pt-4 border-t border-zinc-800/80 flex items-center justify-between">
-                <a href="${fb.download_link}" target="_blank" class="text-xs text-blue-400 hover:underline flex items-center gap-1">
-                  <span>Drive Link</span>
-                  ${icons.external}
-                </a>
+                ${(fb.download_url || fb.download_link) ? `<a href="${fb.download_url || fb.download_link}" target="_blank" class="text-xs text-amber-400 font-semibold hover:underline flex items-center gap-1"><span>Open Drive Link</span>${icons.external}</a>` : `<span class="text-xs text-zinc-500">No Drive Link</span>`}
                 <div class="space-x-2">
                   <button onclick="window.editFreebieModal('${fb.id}')" class="text-xs text-amber-400 font-semibold hover:underline">Edit</button>
                   <button onclick="window.deleteFreebieConfirm('${fb.id}')" class="text-xs text-red-400 hover:text-red-300">Delete</button>
@@ -1544,7 +1541,7 @@
 
             <div>
               <label class="block text-xs font-semibold text-zinc-300 mb-1">Direct Download / Drive Link *</label>
-              <input type="text" value="${fb.download_link || ''}" oninput="state.editingFreebie.download_link = this.value" class="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-3.5 py-2.5 text-xs text-zinc-100">
+              <input type="text" value="${fb.download_url || fb.download_link || ''}" oninput="state.editingFreebie.download_url = this.value; state.editingFreebie.download_link = this.value;" placeholder="https://drive.google.com/..." class="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-3.5 py-2.5 text-xs text-zinc-100">
             </div>
 
             <div>
@@ -2689,6 +2686,8 @@ ${escapeHtml(item.message || '(No message content)')}
       showToast('Pack name is required', 'error');
       return;
     }
+    fb.download_url = (fb.download_url || fb.download_link || '').trim();
+    fb.download_link = fb.download_url;
     if (fb.id) {
       await apiFetch(`/freebies/${fb.id}`, { method: 'PUT', body: JSON.stringify(fb) });
     } else {
