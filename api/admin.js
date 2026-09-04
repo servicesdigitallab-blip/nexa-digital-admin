@@ -33,11 +33,8 @@ const p1 = path.join(process.cwd(), 'data', 'store.json');
 const p2 = path.join(__dirname, '..', 'data', 'store.json');
 const storePath = fs.existsSync(p1) ? p1 : p2;
 
-function getLocalStore() {
-  try {
-    if (fs.existsSync(storePath)) return JSON.parse(fs.readFileSync(storePath, 'utf8'));
-  } catch (e) {}
-  return { products: [], categories: [], popular_picks: [], coupons: [], freebies: [], reviews: [], analytics: {} };
+function triggerStoreSync() {
+  fetch('https://nexadigitaltools.com/api/store/tools?refresh=1', { cache: 'no-store' }).catch(() => {});
 }
 
 module.exports = async (req, res) => {
@@ -219,6 +216,7 @@ module.exports = async (req, res) => {
       console.error('Supabase create error:', e);
     }
 
+    triggerStoreSync();
     return res.status(200).json({ success: true, tool: { ...update, id: newId } });
   }
 
@@ -258,6 +256,7 @@ module.exports = async (req, res) => {
         } catch(e) {}
       }
 
+      triggerStoreSync();
       return res.status(200).json({ success: true, count: ids.length });
     } catch (e) {
       console.error('PUT /tools/reorder error:', e);
@@ -370,6 +369,7 @@ module.exports = async (req, res) => {
       console.error('Supabase update error:', e);
     }
 
+    triggerStoreSync();
     return res.status(200).json({ success: true, tool: { ...update, id: realId } });
     } catch (globalErr) {
       console.error('PUT /tools global error:', globalErr);
@@ -390,6 +390,7 @@ module.exports = async (req, res) => {
         ]);
       } catch (e) {}
     }
+    triggerStoreSync();
     return res.status(200).json({ success: true });
   }
 
