@@ -6195,144 +6195,114 @@
   "coupons": [],
   "freebies": [
     {
-      "id": "c98a235f-d103-47e7-80eb-ce5a4adf5556",
-      "name": "Super Editing Pack",
-      "category": "Editing Packs",
-      "description": "The Super Editing Pack includes essential editing assets and creative resources to help creators produce professional-quality videos quickly and easily.",
-      "image": "https://i.postimg.cc/xTZtJmPp/super-editing-pack.jpg",
-      "download_link": "https://drive.google.com/",
-      "features": [
-        "High Resolution Assets",
-        "Direct Cloud Access",
-        "Commercial Use Allowed"
-      ],
-      "sort_order": 0
-    },
-    {
-      "id": "ee11dd11-4409-43b7-934f-1f7a70b96f4f",
+      "id": "53fb46ee-996a-482c-9f1a-8c18d81c6073",
       "name": "All-in-One Editing Pack",
       "category": "Editing Packs",
       "description": "The All-in-One Editing Pack includes essential tools and resources every editor needs for daily projects. Perfect for beginners and content creators looking for ready-to-use editing assets in one place.",
       "image": "https://i.postimg.cc/TYbfrYYd/all-in-one-editting-pack.webp",
-      "download_link": "https://drive.google.com/",
-      "features": [
-        "High Resolution Assets",
-        "Direct Cloud Access",
-        "Commercial Use Allowed"
-      ],
-      "sort_order": 1
+      "download_url": "https://drive.google.com/drive/folders/10o9ho8E6mw1ytaRZYMug5QEvmVKOqs1F",
+      "features": null,
+      "sort_order": 0,
+      "created_at": "2026-08-14T10:01:25.779437+00:00"
     },
     {
-      "id": "62931f81-a74b-4bc0-aa4d-ede5a2059c4e",
+      "id": "e06490ad-e4f0-408b-80ba-6218f0966331",
       "name": "Animated Icons Pack",
       "category": "Editing Packs",
       "description": "",
       "image": "https://i.postimg.cc/R0wPX641/100-animated-3d-icons-pack-download-24240318-videohive-free-hunterae-com.jpg",
-      "download_link": "https://drive.google.com/",
-      "features": [
-        "High Resolution Assets",
-        "Direct Cloud Access",
-        "Commercial Use Allowed"
-      ],
-      "sort_order": 2
+      "download_url": "https://drive.google.com/drive/folders/1P5TVzv7GWa1r0UzjYiPPAZ-nq_gDTHQm?usp=sharing",
+      "features": null,
+      "sort_order": 0,
+      "created_at": "2026-08-14T10:01:26.069232+00:00"
     },
     {
-      "id": "b07611af-9cc8-42ae-b85b-f60ea90e90d8",
+      "id": "8f6ff3ad-7c0f-4883-8bf8-a57e7686f0fc",
       "name": "Animated Arrows Pack",
       "category": "Editing Packs",
       "description": "",
       "image": "https://i.postimg.cc/0j7DqmXV/arrows-set-of-black-icons-illustration-vector.jpg",
-      "download_link": "https://drive.google.com/",
-      "features": [
-        "High Resolution Assets",
-        "Direct Cloud Access",
-        "Commercial Use Allowed"
-      ],
-      "sort_order": 3
+      "download_url": "https://drive.google.com/drive/folders/13yie7B6VoS4sDYtE044aaXexrzyz-qy8?usp=sharing",
+      "features": null,
+      "sort_order": 0,
+      "created_at": "2026-08-14T10:01:26.328425+00:00"
     },
     {
-      "id": "637d1de7-447c-4f5b-b0bc-69250e8dd47b",
+      "id": "8a32cb50-a5f0-4453-beca-7b75e43b4d68",
       "name": "Motion Background Packs",
       "category": "Editing Packs",
       "description": "",
       "image": "https://i.postimg.cc/B60JVKFz/background-packs.jpg",
-      "download_link": "https://drive.google.com/",
-      "features": [
-        "High Resolution Assets",
-        "Direct Cloud Access",
-        "Commercial Use Allowed"
-      ],
-      "sort_order": 4
+      "download_url": "https://drive.google.com/drive/folders/1oBkyPgfiKA5NE3GV_Z5caHyPNXPmcUaP?usp=sharing",
+      "features": null,
+      "sort_order": 0,
+      "created_at": "2026-08-14T10:01:26.611364+00:00"
     },
     {
-      "id": "8e478e6d-7c5d-4885-89b9-1bb8a7e5130a",
+      "id": "ba80237c-7dd4-4aab-9055-9ce4ac069b71",
       "name": "Glowing Icons Packs",
       "category": "Editing Packs",
       "description": "",
       "image": "https://i.postimg.cc/qqNDcmRr/animated-glow-icons-packs.jpg",
-      "download_link": "https://drive.google.com/",
-      "features": [
-        "High Resolution Assets",
-        "Direct Cloud Access",
-        "Commercial Use Allowed"
-      ],
-      "sort_order": 5
+      "download_url": "https://drive.google.com/drive/folders/14EicLrVjetkTtyLYSvVdcuNP0WpGvYgA?usp=sharing",
+      "features": null,
+      "sort_order": 0,
+      "created_at": "2026-08-14T10:01:26.859914+00:00"
     },
     {
-      "id": "3751a561-2046-4616-9878-3196412cd5ca",
+      "id": "04fbcc18-834e-4439-b573-3b837b117a54",
       "name": "Back Ground Music Pack",
       "category": "Editing Packs",
       "description": "",
       "image": "https://i.postimg.cc/3NQ9p3PX/music-pack-g.png",
-      "download_link": "https://drive.google.com/",
-      "features": [
-        "High Resolution Assets",
-        "Direct Cloud Access",
-        "Commercial Use Allowed"
-      ],
-      "sort_order": 6
+      "download_url": "https://drive.google.com/drive/folders/1U3ZjkI63udIydsdJW1kwryw7SEh01yvZ?usp=sharing",
+      "features": null,
+      "sort_order": 0,
+      "created_at": "2026-08-14T10:01:27.145884+00:00"
     },
     {
-      "id": "555e653f-3549-4286-9e52-e306a4812f8e",
+      "id": "60f79497-08c4-4852-85d0-b24a78bbf6f9",
       "name": "GFX   PACKS",
       "category": "Editing Packs",
       "description": "",
       "image": "https://i.postimg.cc/fWvY57XL/gfx-pack.jpg",
-      "download_link": "https://drive.google.com/",
-      "features": [
-        "High Resolution Assets",
-        "Direct Cloud Access",
-        "Commercial Use Allowed"
-      ],
-      "sort_order": 7
+      "download_url": "https://drive.google.com/drive/folders/15KQ5T0-u2nVj-DYYooENcuvxvxLsV_2-?usp=sharing",
+      "features": null,
+      "sort_order": 0,
+      "created_at": "2026-08-14T10:01:27.838093+00:00"
     },
     {
-      "id": "4eac8b29-5a09-4c37-b70c-ba94b0b5a752",
+      "id": "66875d59-6ca7-4dc4-9351-639bb0fb1d9a",
       "name": "Luts Pack",
       "category": "Editing Packs",
       "description": "",
       "image": "https://i.postimg.cc/1zHybzrk/luts-pack.jpg",
-      "download_link": "https://drive.google.com/",
-      "features": [
-        "High Resolution Assets",
-        "Direct Cloud Access",
-        "Commercial Use Allowed"
-      ],
-      "sort_order": 8
+      "download_url": "https://drive.google.com/drive/folders/10wM-Fn612WsVxwi26d5uffiIUeKmM4rP?usp=sharing",
+      "features": null,
+      "sort_order": 0,
+      "created_at": "2026-08-14T10:01:28.379427+00:00"
     },
     {
-      "id": "c6e90fe4-89e1-4127-b996-47d7cb2c6a39",
+      "id": "aed88669-27f0-49b9-9902-9db6b047edbc",
       "name": "Animated Letter",
       "category": "Editing Packs",
       "description": "",
       "image": "https://i.postimg.cc/7ZN6rXH8/animated-letters.jpg",
-      "download_link": "https://drive.google.com/",
-      "features": [
-        "High Resolution Assets",
-        "Direct Cloud Access",
-        "Commercial Use Allowed"
-      ],
-      "sort_order": 9
+      "download_url": "https://drive.google.com/drive/folders/1VDHFfoPiwkNKZ9KuPW2HsCoN5mf72hMf?usp=sharing",
+      "features": null,
+      "sort_order": 0,
+      "created_at": "2026-08-14T10:01:28.646382+00:00"
+    },
+    {
+      "id": "6c620a19-4dc8-4129-bb86-ea9e157f8abc",
+      "name": "Super Editing Pack",
+      "category": "Editing Packs",
+      "description": "The Super Editing Pack includes essential editing assets and creative resources to help creators produce professional-quality videos quickly and easily.",
+      "image": "https://i.postimg.cc/xTZtJmPp/super-editing-pack.jpg",
+      "download_url": "https://drive.google.com/drive/folders/10o9ho8E6mw1ytaRZYMug5QEvmVKOqs1F",
+      "features": null,
+      "sort_order": 0,
+      "created_at": "2026-08-14T10:01:25.514445+00:00"
     }
   ],
   "reviews": [
